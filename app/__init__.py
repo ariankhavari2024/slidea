@@ -9,7 +9,7 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 from celery import Celery, Task
-from config import Config, PLAN_NAME_MAP
+from config import Config, PLAN_NAME_MAP # Import Config and PLAN_NAME_MAP
 import stripe
 import logging
 
@@ -17,14 +17,15 @@ import logging
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
-csrf = CSRFProtect() # Initialize CSRFProtect here
+csrf = CSRFProtect()
 cors = CORS()
 
 # Configure Flask-Login
 login_manager.login_view = 'main.login'
 login_manager.login_message_category = 'info'
 
-# Celery Initialization - Define the instance but configure it fully inside create_app
+# Celery Initialization - Define the instance
+# Configuration will be loaded from the Config object via app.config
 celery = Celery(__name__, include=['app.tasks'])
 
 # ContextTask Definition for Celery
@@ -43,7 +44,6 @@ class ContextTask(celery.Task):
                      app_config_class = type(current_app.config)
              except RuntimeError:
                  pass
-             # Use the same create_app factory to ensure consistent config
              ContextTask._flask_app = create_app(config_class=app_config_class)
              print(f"--- Flask app instance created/recreated for Celery: {id(ContextTask._flask_app)} ---")
         return ContextTask._flask_app
@@ -62,6 +62,8 @@ def create_app(config_class=Config):
     app = Flask(__name__, instance_path=config_class.INSTANCE_PATH, instance_relative_config=False)
     
     # Load configuration from the specified config_class object.
+    # This is where CELERY_BROKER_URL and CELERY_RESULT_BACKEND should be loaded
+    # from config.py (which reads from os.environ)
     app.config.from_object(config_class)
     
     # Add PLAN_NAME_MAP to app.config
@@ -73,38 +75,26 @@ def create_app(config_class=Config):
     # Initialize Stripe API key
     stripe.api_key = app.config.get('STRIPE_SECRET_KEY')
     if not stripe.api_key:
-        app.logger.warning("Stripe Secret Key is not configured. Stripe functionality will be disabled.")
+        app.logger.warning("Stripe Secret Key is not configured.")
     else:
-        app.logger.info("Stripe Secret Key loaded for the app.")
+        app.logger.info("Stripe Secret Key loaded.")
 
-    # Initialize Flask extensions with the app instance
+    # Initialize Flask extensions
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
-    csrf.init_app(app) # Initialize CSRF protection for the app
+    csrf.init_app(app)
     print("--- CSRF Protection Enabled Globally ---")
     cors.init_app(app)
 
-    # --- Explicitly Configure Celery AFTER app config is loaded ---
-    # Read the REDIS_URL injected by Render (or fallback from config.py)
-    redis_url = app.config.get('REDIS_URL')
-    if not redis_url:
-        app.logger.warning("REDIS_URL not found in environment, Celery might use fallback.")
-        # Use the fallbacks defined in config.py if REDIS_URL isn't set
-        redis_url = app.config.get('CELERY_BROKER_URL') # Get fallback from config
-
-    celery.conf.update(
-        broker_url=redis_url,
-        result_backend=redis_url,
-        # You can add other Celery settings from app.config here too if needed
-        # Example: task_serializer=app.config.get('CELERY_TASK_SERIALIZER', 'json'),
-    )
-    # Update the app config as well, just in case other parts rely on it
-    app.config['CELERY_BROKER_URL'] = redis_url
-    app.config['CELERY_RESULT_BACKEND'] = redis_url
-    print(f"--- Celery configured with Broker/Backend: {redis_url} ---")
-    # --- End Explicit Celery Configuration ---
-
+    # --- Configure Celery Instance with App Config ---
+    # Update the Celery instance's configuration using the loaded app config
+    celery.conf.update(app.config)
+    # Ensure the broker/backend URLs are explicitly set from the potentially updated app.config
+    celery.conf.broker_url = app.config.get('CELERY_BROKER_URL')
+    celery.conf.result_backend = app.config.get('CELERY_RESULT_BACKEND')
+    print(f"--- Celery instance updated with Broker/Backend from app.config: {celery.conf.broker_url} ---")
+    # --- End Celery Configuration Update ---
 
     # Register 'before_request' hook
     @app.before_request
@@ -128,19 +118,18 @@ def create_app(config_class=Config):
                 csrf.exempt(app.view_functions[route_name])
                 app.logger.info(f"CSRF Exemption applied to {route_name} view.")
             else:
-                app.logger.warning(f"--- WARNING: View function '{route_name}' not found for CSRF exemption. Check route definition and blueprint registration. ---")
+                app.logger.warning(f"--- WARNING: View function '{route_name}' not found for CSRF exemption. ---")
 
     # Register Context Processor
     @app.context_processor
     def inject_now():
         return {'now': datetime.now(timezone.utc)}
 
-    # Log key config values (Check Celery URL here)
+    # Log key config values
     app.logger.info(f"Database URI: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
-    app.logger.info(f"Celery Broker URL (Final): {app.config.get('CELERY_BROKER_URL')}") # Log the final URL used
-    app.logger.info(f"Celery Result Backend (Final): {app.config.get('CELERY_RESULT_BACKEND')}") # Log the final URL used
-    app.logger.info(f"Stripe Publishable Key Loaded: {'Yes' if app.config.get('STRIPE_PUBLISHABLE_KEY') else 'No'}")
-    # ... (log other keys as needed) ...
+    app.logger.info(f"Celery Broker URL (from app.config): {app.config.get('CELERY_BROKER_URL')}")
+    app.logger.info(f"Celery Result Backend (from app.config): {app.config.get('CELERY_RESULT_BACKEND')}")
+    # ... (log other keys) ...
 
     # Debug print for URL rules
     print("--- Registered URL Rules (Post Blueprint Registration) ---")
@@ -148,3 +137,4 @@ def create_app(config_class=Config):
     print("----------------------------------------------------------")
 
     return app
+
