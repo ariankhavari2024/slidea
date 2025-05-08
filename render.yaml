@@ -1,25 +1,29 @@
 # render.yaml
 # Blueprint for deploying the SlideaAI Flask application on Render
+# Using top-level keys for managed database and redis
 
-services:
-  # PostgreSQL Database
-  - type: postgres # Use Render's specific type for managed PostgreSQL
-    name: slidea-db
+# Managed Database Definition
+databases:
+  - name: slidea-db
     plan: starter # IMPORTANT: Use a paid plan (e.g., 'starter') to allow disk persistence
+    databaseName: slidea_db # Optional: specify the database name Render creates
+    user: slidea_user # Optional: specify the user Render creates
     postgres:
-      version: 15 # Version specification is valid under type: postgres
+      version: 15
     disk:
       name: slidea-db-data
-      sizeGB: 1 # Smallest disk size, adjust if needed
-      mountPath: /var/lib/postgresql/data # Standard mount path for Render Postgres
+      sizeGB: 1
+      mountPath: /var/lib/postgresql/data # Standard mount path
 
-  # Redis Cache/Broker
-  - type: redis # Use Render's specific type for managed Redis
-    name: slidea-redis
+# Managed Redis Definition
+redis:
+  - name: slidea-redis
     plan: free # Free tier is usually okay for Redis cache/broker initially
     redis:
-      version: 7 # Version specification is valid under type: redis
+      version: 7
 
+# Application Services Definition
+services:
   # Flask Web Service (using Gunicorn)
   - type: web
     name: slidea-web
@@ -38,10 +42,10 @@ services:
         value: production # Set Flask environment to production
       - key: SECRET_KEY
         generateValue: true # Let Render generate a secure secret key
-      # --- Database & Redis Connection (Render injects these automatically based on type) ---
+      # --- Database & Redis Connection (Render injects these automatically) ---
       # DATABASE_URL and REDIS_URL are automatically injected by Render
-      # when linking services of type 'postgres' and 'redis'.
-      # We just need to ensure our Flask/Celery config reads them.
+      # when databases and redis sections are defined at the top level.
+      # Ensure your config.py reads these environment variables.
       # --- Celery Config (Point to the automatically injected REDIS_URL) ---
       - key: CELERY_BROKER_URL
         fromEnvVar: REDIS_URL # Use the URL Render injects
