@@ -192,4 +192,7 @@ def create_app(config_class=Config):
     print("----------------------------------------------------------")
 
     return app
-
+if os.environ.get("IS_WEB_SERVICE") == "false":
+    print("--- Running as a worker: bootstrapping Flask and Celery manually ---")
+    flask_app = create_app()
+    celery = make_celery(flask_app)

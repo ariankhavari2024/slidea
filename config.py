@@ -15,6 +15,7 @@ print(f"--- Config: Attempted to load .env from: {dotenv_path} ---")
 class Config:
     """Base configuration class."""
     # Flask specific config
+    REDIS_URL = os.environ.get('REDIS_URL')
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
     BASE_DIR = os.path.abspath(os.path.join(basedir, '..'))
     INSTANCE_PATH = os.path.join(BASE_DIR, 'instance')
