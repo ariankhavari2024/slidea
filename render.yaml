@@ -1,26 +1,20 @@
 # render.yaml
 # Blueprint for deploying the SlideaAI Flask application on Render
-# Using top-level keys for managed database and redis
+# Using simplified top-level keys for managed database and redis
 
 # Managed Database Definition
 databases:
   - name: slidea-db
-    plan: starter # IMPORTANT: Use a paid plan (e.g., 'starter') to allow disk persistence
+    plan: starter # IMPORTANT: Use a paid plan (e.g., 'starter') for persistence. Disk is implied by paid plan.
     databaseName: slidea_db # Optional: specify the database name Render creates
     user: slidea_user # Optional: specify the user Render creates
-    postgres:
-      version: 15
-    disk:
-      name: slidea-db-data
-      sizeGB: 1
-      mountPath: /var/lib/postgresql/data # Standard mount path
+    # Version and Disk are typically managed by Render based on the plan/UI settings
 
 # Managed Redis Definition
 redis:
   - name: slidea-redis
     plan: free # Free tier is usually okay for Redis cache/broker initially
-    redis:
-      version: 7
+    # Version is typically managed by Render based on the plan/UI settings
 
 # Application Services Definition
 services:
