@@ -1,20 +1,23 @@
 # render.yaml
 # Blueprint for deploying the SlideaAI Flask application on Render
-# Defining Database and Redis as Private Services (pserv)
+# Using top-level keys for managed database and redis (Attempt 7)
 
-services:
-  # PostgreSQL Database (as a Private Service)
-  - type: pserv
-    name: slidea-db
-    env: postgres # Hint for Render to use PostgreSQL
-    plan: starter # IMPORTANT: Use a paid plan for persistence. Disk settings are managed in Render UI for pserv.
+# Managed Database Definition
+databases:
+  - name: slidea-db
+    plan: starter # IMPORTANT: Use a paid plan (e.g., 'starter') for persistence.
+    # databaseName: slidea_db # Optional: specify the database name Render creates
+    # user: slidea_user # Optional: specify the user Render creates
+    # Version and Disk settings are managed in the Render Dashboard for this type
 
-  # Redis Cache/Broker (as a Private Service)
-  - type: pserv
-    name: slidea-redis
-    env: redis # Hint for Render to use Redis
+# Managed Redis Definition
+redis:
+  - name: slidea-redis
     plan: free # Free tier is usually okay for Redis cache/broker initially
+    # Version settings are managed in the Render Dashboard for this type
 
+# Application Services Definition
+services:
   # Flask Web Service (using Gunicorn)
   - type: web
     name: slidea-web
@@ -34,7 +37,8 @@ services:
       - key: SECRET_KEY
         generateValue: true # Let Render generate a secure secret key
       # --- Database & Redis Connection ---
-      # Render should inject DATABASE_URL and REDIS_URL based on the pserv names/envs
+      # DATABASE_URL and REDIS_URL are automatically injected by Render
+      # when databases and redis sections are defined at the top level.
       # Ensure your config.py reads os.environ.get('DATABASE_URL') and os.environ.get('REDIS_URL')
       # --- Celery Config (Reads REDIS_URL from environment in config.py) ---
       # NO EXPLICIT CELERY URLs NEEDED HERE if config.py uses REDIS_URL
