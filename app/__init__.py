@@ -24,7 +24,7 @@ cors = CORS()
 login_manager.login_view = 'main.login'
 login_manager.login_message_category = 'info'
 
-# Celery Initialization
+# Celery Initialization - Define the instance but configure it fully inside create_app
 celery = Celery(__name__, include=['app.tasks'])
 
 # ContextTask Definition for Celery
@@ -43,6 +43,7 @@ class ContextTask(celery.Task):
                      app_config_class = type(current_app.config)
              except RuntimeError:
                  pass
+             # Use the same create_app factory to ensure consistent config
              ContextTask._flask_app = create_app(config_class=app_config_class)
              print(f"--- Flask app instance created/recreated for Celery: {id(ContextTask._flask_app)} ---")
         return ContextTask._flask_app
@@ -59,7 +60,11 @@ def create_app(config_class=Config):
     print(f"--- create_app called (config_class: {config_class.__name__}) ---")
 
     app = Flask(__name__, instance_path=config_class.INSTANCE_PATH, instance_relative_config=False)
+    
+    # Load configuration from the specified config_class object.
     app.config.from_object(config_class)
+    
+    # Add PLAN_NAME_MAP to app.config
     app.config['PLAN_NAME_MAP'] = PLAN_NAME_MAP
     print(f"--- App Init: Added PLAN_NAME_MAP to app.config: {app.config.get('PLAN_NAME_MAP')} ---")
 
@@ -80,10 +85,26 @@ def create_app(config_class=Config):
     print("--- CSRF Protection Enabled Globally ---")
     cors.init_app(app)
 
-    # Configure Celery
-    celery.conf.update(app.config)
-    celery.conf.broker_url = app.config.get('CELERY_BROKER_URL')
-    celery.conf.result_backend = app.config.get('CELERY_RESULT_BACKEND')
+    # --- Explicitly Configure Celery AFTER app config is loaded ---
+    # Read the REDIS_URL injected by Render (or fallback from config.py)
+    redis_url = app.config.get('REDIS_URL')
+    if not redis_url:
+        app.logger.warning("REDIS_URL not found in environment, Celery might use fallback.")
+        # Use the fallbacks defined in config.py if REDIS_URL isn't set
+        redis_url = app.config.get('CELERY_BROKER_URL') # Get fallback from config
+
+    celery.conf.update(
+        broker_url=redis_url,
+        result_backend=redis_url,
+        # You can add other Celery settings from app.config here too if needed
+        # Example: task_serializer=app.config.get('CELERY_TASK_SERIALIZER', 'json'),
+    )
+    # Update the app config as well, just in case other parts rely on it
+    app.config['CELERY_BROKER_URL'] = redis_url
+    app.config['CELERY_RESULT_BACKEND'] = redis_url
+    print(f"--- Celery configured with Broker/Backend: {redis_url} ---")
+    # --- End Explicit Celery Configuration ---
+
 
     # Register 'before_request' hook
     @app.before_request
@@ -95,21 +116,18 @@ def create_app(config_class=Config):
         from . import models
 
     # --- Blueprint Registration ---
-    # Import the blueprint AFTER initializing extensions but BEFORE applying exemptions
     from .routes import main as main_blueprint
     app.register_blueprint(main_blueprint)
     print("--- Registered main blueprint ---")
 
     # --- Apply CSRF exemptions AFTER blueprint registration ---
-    # This ensures the view functions exist when exempt is called
-    with app.app_context(): # Ensure exemptions happen within app context
+    with app.app_context():
         exempt_routes = ['main.stripe_webhook', 'main.process_plan_change']
         for route_name in exempt_routes:
             if route_name in app.view_functions:
                 csrf.exempt(app.view_functions[route_name])
                 app.logger.info(f"CSRF Exemption applied to {route_name} view.")
             else:
-                # Use app.logger for consistency
                 app.logger.warning(f"--- WARNING: View function '{route_name}' not found for CSRF exemption. Check route definition and blueprint registration. ---")
 
     # Register Context Processor
@@ -117,12 +135,11 @@ def create_app(config_class=Config):
     def inject_now():
         return {'now': datetime.now(timezone.utc)}
 
-    # Log key config values
+    # Log key config values (Check Celery URL here)
     app.logger.info(f"Database URI: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
-    app.logger.info(f"Celery Broker: {celery.conf.broker_url}")
+    app.logger.info(f"Celery Broker URL (Final): {app.config.get('CELERY_BROKER_URL')}") # Log the final URL used
+    app.logger.info(f"Celery Result Backend (Final): {app.config.get('CELERY_RESULT_BACKEND')}") # Log the final URL used
     app.logger.info(f"Stripe Publishable Key Loaded: {'Yes' if app.config.get('STRIPE_PUBLISHABLE_KEY') else 'No'}")
-    app.logger.info(f"Stripe Secret Key Loaded: {'Yes' if app.config.get('STRIPE_SECRET_KEY') else 'No'}")
-    app.logger.info(f"Stripe Endpoint Secret Loaded: {'Yes' if app.config.get('STRIPE_ENDPOINT_SECRET') else 'No'}")
     # ... (log other keys as needed) ...
 
     # Debug print for URL rules
