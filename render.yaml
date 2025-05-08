@@ -3,24 +3,22 @@
 
 services:
   # PostgreSQL Database
-  - type: pserv # Private Service - Database
+  - type: postgres # Use Render's specific type for managed PostgreSQL
     name: slidea-db
-    env: postgres # Use Render's managed PostgreSQL environment (This defines the type)
-    plan: free # Start with free, upgrade later if needed (e.g., 'starter')
-    # postgres: # REMOVED THIS INVALID KEY
-    #   version: 15 # REMOVED - Version managed by Render or dashboard settings
+    plan: starter # IMPORTANT: Use a paid plan (e.g., 'starter') to allow disk persistence
+    postgres:
+      version: 15 # Version specification is valid under type: postgres
     disk:
       name: slidea-db-data
       sizeGB: 1 # Smallest disk size, adjust if needed
-      mountPath: /var/lib/postgresql/data
+      mountPath: /var/lib/postgresql/data # Standard mount path for Render Postgres
 
   # Redis Cache/Broker
-  - type: pserv # Private Service - Cache
+  - type: redis # Use Render's specific type for managed Redis
     name: slidea-redis
-    env: redis # Use Render's managed Redis environment (This defines the type)
-    plan: free # Start with free, upgrade later if needed (e.g., 'starter')
-    # redis: # REMOVED THIS INVALID KEY
-    #   version: 7 # REMOVED - Version managed by Render or dashboard settings
+    plan: free # Free tier is usually okay for Redis cache/broker initially
+    redis:
+      version: 7 # Version specification is valid under type: redis
 
   # Flask Web Service (using Gunicorn)
   - type: web
@@ -40,28 +38,15 @@ services:
         value: production # Set Flask environment to production
       - key: SECRET_KEY
         generateValue: true # Let Render generate a secure secret key
-      # --- Database Connection (Render provides this automatically) ---
-      - key: DATABASE_URL
-        fromService:
-          type: pserv
-          name: slidea-db
-          property: connectionString
-      # --- Redis Connection (Render provides this automatically) ---
-      - key: REDIS_URL # Often used directly by libraries
-        fromService:
-          type: pserv
-          name: slidea-redis
-          property: connectionString
-      - key: CELERY_BROKER_URL # Explicitly set for Celery config
-        fromService:
-          type: pserv
-          name: slidea-redis
-          property: connectionString
-      - key: CELERY_RESULT_BACKEND # Explicitly set for Celery config
-        fromService:
-          type: pserv
-          name: slidea-redis
-          property: connectionString
+      # --- Database & Redis Connection (Render injects these automatically based on type) ---
+      # DATABASE_URL and REDIS_URL are automatically injected by Render
+      # when linking services of type 'postgres' and 'redis'.
+      # We just need to ensure our Flask/Celery config reads them.
+      # --- Celery Config (Point to the automatically injected REDIS_URL) ---
+      - key: CELERY_BROKER_URL
+        fromEnvVar: REDIS_URL # Use the URL Render injects
+      - key: CELERY_RESULT_BACKEND
+        fromEnvVar: REDIS_URL # Use the URL Render injects
       # --- External API Keys (Set these in Render Dashboard Environment Secrets) ---
       - key: OPENAI_API_KEY
         sync: false # Do not sync from yaml, set in Render UI
@@ -105,26 +90,14 @@ services:
           type: web
           name: slidea-web
           envVarKey: SECRET_KEY
-      - key: DATABASE_URL
-        fromService:
-          type: pserv
-          name: slidea-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: pserv
-          name: slidea-redis
-          property: connectionString
+      # --- Database & Redis Connection (Render injects these automatically) ---
+      # DATABASE_URL and REDIS_URL are automatically injected by Render
+      # --- Celery Config (Point to the automatically injected REDIS_URL) ---
       - key: CELERY_BROKER_URL
-        fromService:
-          type: pserv
-          name: slidea-redis
-          property: connectionString
+        fromEnvVar: REDIS_URL # Use the URL Render injects
       - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: pserv
-          name: slidea-redis
-          property: connectionString
+        fromEnvVar: REDIS_URL # Use the URL Render injects
+      # --- External API Keys (Set these in Render Dashboard Environment Secrets) ---
       - key: OPENAI_API_KEY
         sync: false # Set directly in Render dashboard secrets
       - key: STRIPE_SECRET_KEY # Worker might not need Stripe keys, but include if tasks use them
