@@ -34,11 +34,9 @@ class Config:
     # OpenAI Config
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
-    # --- Celery Config - PRIORITIZE RENDER'S REDIS_URL ---
-    # Render automatically injects REDIS_URL for linked Redis services
-    REDIS_URL = os.environ.get('REDIS_URL') # Read the Render-injected URL
-    CELERY_BROKER_URL = REDIS_URL or 'redis://localhost:6379/0' # Use REDIS_URL if available, else fallback
-    CELERY_RESULT_BACKEND = REDIS_URL or 'redis://localhost:6379/0' # Use REDIS_URL if available, else fallback
+    # --- Celery Config - REMOVED ---
+    # Celery will now read CELERY_BROKER_URL and CELERY_RESULT_BACKEND directly
+    # from environment variables set in render.yaml or by Render itself.
     # --- End Celery Config ---
 
     # Logging Config

@@ -25,7 +25,7 @@ login_manager.login_view = 'main.login'
 login_manager.login_message_category = 'info'
 
 # Celery Initialization - Define the instance
-# Configuration will be loaded from the Config object via app.config
+# Configuration will be read directly from environment variables by Celery
 celery = Celery(__name__, include=['app.tasks'])
 
 # ContextTask Definition for Celery
@@ -62,8 +62,6 @@ def create_app(config_class=Config):
     app = Flask(__name__, instance_path=config_class.INSTANCE_PATH, instance_relative_config=False)
     
     # Load configuration from the specified config_class object.
-    # This is where CELERY_BROKER_URL and CELERY_RESULT_BACKEND should be loaded
-    # from config.py (which reads from os.environ)
     app.config.from_object(config_class)
     
     # Add PLAN_NAME_MAP to app.config
@@ -87,14 +85,8 @@ def create_app(config_class=Config):
     print("--- CSRF Protection Enabled Globally ---")
     cors.init_app(app)
 
-    # --- Configure Celery Instance with App Config ---
-    # Update the Celery instance's configuration using the loaded app config
-    celery.conf.update(app.config)
-    # Ensure the broker/backend URLs are explicitly set from the potentially updated app.config
-    celery.conf.broker_url = app.config.get('CELERY_BROKER_URL')
-    celery.conf.result_backend = app.config.get('CELERY_RESULT_BACKEND')
-    print(f"--- Celery instance updated with Broker/Backend from app.config: {celery.conf.broker_url} ---")
-    # --- End Celery Configuration Update ---
+    # --- REMOVED Explicit Celery Configuration Update Block ---
+    # Celery will read config directly from environment variables
 
     # Register 'before_request' hook
     @app.before_request
@@ -127,8 +119,9 @@ def create_app(config_class=Config):
 
     # Log key config values
     app.logger.info(f"Database URI: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
-    app.logger.info(f"Celery Broker URL (from app.config): {app.config.get('CELERY_BROKER_URL')}")
-    app.logger.info(f"Celery Result Backend (from app.config): {app.config.get('CELERY_RESULT_BACKEND')}")
+    app.logger.info(f"Celery Broker URL (from env): {os.environ.get('CELERY_BROKER_URL')}") # Check env directly
+    app.logger.info(f"Celery Result Backend (from env): {os.environ.get('CELERY_RESULT_BACKEND')}") # Check env directly
+    app.logger.info(f"Stripe Publishable Key Loaded: {'Yes' if app.config.get('STRIPE_PUBLISHABLE_KEY') else 'No'}")
     # ... (log other keys) ...
 
     # Debug print for URL rules
@@ -137,4 +130,3 @@ def create_app(config_class=Config):
     print("----------------------------------------------------------")
 
     return app
-

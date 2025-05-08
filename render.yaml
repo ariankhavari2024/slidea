@@ -1,13 +1,16 @@
 # render.yaml
 # Blueprint for deploying the SlideaAI Flask application on Render
-# Defining DB at top-level, Redis as keyvalue service, injecting URLs
+# Using top-level keys for DB/Redis, explicit Celery Env Vars in services
 
 # Managed Database Definition
 databases:
   - name: slidea-db
-    plan: pro-4gb # IMPORTANT: Use a paid plan for persistence.
-    # databaseName: slidea_db # Optional
-    # user: slidea_user # Optional
+    plan: starter # IMPORTANT: Use a paid plan for persistence.
+
+# Managed Redis Definition
+redis:
+  - name: slidea-redis
+    plan: free # Free tier is usually okay for Redis cache/broker initially
 
 # Application Services Definition
 services:
@@ -18,7 +21,6 @@ services:
     plan: starter # IMPORTANT: Use a paid plan
     dockerfilePath: ./Dockerfile
     envVars:
-      # --- Core Flask/Python Settings ---
       - key: PYTHON_VERSION
         value: 3.11
       - key: FLASK_APP
@@ -27,19 +29,13 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true
-      # --- Database Connection ---
-      - key: DATABASE_URL
-        fromDatabase:
-          name: slidea-db
-          property: connectionString # Standard property for databases
-      # --- Redis Connection ---
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue # Reference the type of the Redis service
-          name: slidea-redis
-          property: connectionString # Standard property for redis/keyvalue
-      # --- Celery Config (Reads REDIS_URL from environment) ---
-      # NO EXPLICIT CELERY URLs NEEDED HERE if config.py uses REDIS_URL
+      # --- Database & Redis Connection ---
+      # DATABASE_URL and REDIS_URL are automatically injected by Render
+      # --- Explicit Celery Config using Render's REDIS_URL ---
+      - key: CELERY_BROKER_URL
+        fromEnvVar: REDIS_URL # Explicitly set CELERY_BROKER_URL from injected REDIS_URL
+      - key: CELERY_RESULT_BACKEND
+        fromEnvVar: REDIS_URL # Explicitly set CELERY_RESULT_BACKEND from injected REDIS_URL
       # --- Secrets (Set in Render UI) ---
       - key: OPENAI_API_KEY
         sync: false
@@ -69,41 +65,33 @@ services:
       - key: PYTHON_VERSION
         value: 3.11
       - key: FLASK_APP
-        value: wsgi:app
+        value: wsgi:app # Worker still needs app context
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
-        fromService: # Get the same generated key as the web service
-          type: web # Correct type for referencing web service env var
+        fromService:
           name: slidea-web
           envVarKey: SECRET_KEY
-      # --- Database Connection ---
-      - key: DATABASE_URL
-        fromDatabase:
-          name: slidea-db
-          property: connectionString
-      # --- Redis Connection ---
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue # Reference the type of the Redis service
-          name: slidea-redis
-          property: connectionString
-      # --- Celery Config (Reads REDIS_URL from environment) ---
-      # NO EXPLICIT CELERY URLs NEEDED HERE if config.py uses REDIS_URL
+      # --- Database & Redis Connection ---
+      # DATABASE_URL and REDIS_URL are automatically injected
+      # --- Explicit Celery Config using Render's REDIS_URL ---
+      - key: CELERY_BROKER_URL
+        fromEnvVar: REDIS_URL # Explicitly set CELERY_BROKER_URL from injected REDIS_URL
+      - key: CELERY_RESULT_BACKEND
+        fromEnvVar: REDIS_URL # Explicitly set CELERY_RESULT_BACKEND from injected REDIS_URL
       # --- Secrets (Set in Render UI) ---
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
+        sync: false
+      # --- ADDED MISSING STRIPE PRICE IDs FOR WORKER ---
+      # These are needed so config.py can build PLAN_NAME_MAP in the worker
+      - key: STRIPE_PRICE_ID_PRO
+        sync: false
+      - key: STRIPE_PRICE_ID_CREATOR
         sync: false
       # --- Service Type ---
       - key: SERVICE_TYPE
         value: worker
       - key: IS_WEB_SERVICE
         value: "false"
-
-  # Redis Service (Defined as Key-Value Store)
-  - type: keyvalue # Define Redis using the 'keyvalue' type
-    name: slidea-redis
-    plan: free # Free tier is usually okay for Redis cache/broker initially
-    ipAllowList: [] # Optional: Allow connections from anywhere (adjust if needed)
-    # Version is managed by Render for keyvalue type
