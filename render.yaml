@@ -5,10 +5,10 @@ services:
   # PostgreSQL Database
   - type: pserv # Private Service - Database
     name: slidea-db
-    env: postgres # Use Render's managed PostgreSQL environment
+    env: postgres # Use Render's managed PostgreSQL environment (This defines the type)
     plan: free # Start with free, upgrade later if needed (e.g., 'starter')
-    postgres:
-      version: 15 # Specify desired PostgreSQL version
+    # postgres: # REMOVED THIS INVALID KEY
+    #   version: 15 # REMOVED - Version managed by Render or dashboard settings
     disk:
       name: slidea-db-data
       sizeGB: 1 # Smallest disk size, adjust if needed
@@ -17,10 +17,10 @@ services:
   # Redis Cache/Broker
   - type: pserv # Private Service - Cache
     name: slidea-redis
-    env: redis # Use Render's managed Redis environment
+    env: redis # Use Render's managed Redis environment (This defines the type)
     plan: free # Start with free, upgrade later if needed (e.g., 'starter')
-    redis:
-      version: 7 # Specify desired Redis version
+    # redis: # REMOVED THIS INVALID KEY
+    #   version: 7 # REMOVED - Version managed by Render or dashboard settings
 
   # Flask Web Service (using Gunicorn)
   - type: web
