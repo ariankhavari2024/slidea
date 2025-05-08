@@ -5,7 +5,7 @@
 # Managed Database Definition
 databases:
   - name: slidea-db
-    plan: starter # IMPORTANT: Use a paid plan for persistence.
+    plan: pro-4gb # IMPORTANT: Use a paid plan for persistence.
     # databaseName: slidea_db # Optional
     # user: slidea_user # Optional
 
