@@ -25,7 +25,8 @@ login_manager.login_view = 'main.login'
 login_manager.login_message_category = 'info'
 
 # Celery Initialization - Define the instance
-# Configuration will be read directly from environment variables by Celery
+# Configuration will be loaded from the Config object via app.config
+# AND explicitly updated below
 celery = Celery(__name__, include=['app.tasks'])
 
 # ContextTask Definition for Celery
@@ -85,8 +86,33 @@ def create_app(config_class=Config):
     print("--- CSRF Protection Enabled Globally ---")
     cors.init_app(app)
 
-    # --- REMOVED Explicit Celery Configuration Update Block ---
-    # Celery will read config directly from environment variables
+    # --- Explicitly Configure Celery AFTER app config is loaded ---
+    # Read the URLs from the app config (which should have loaded from env)
+    broker_url = app.config.get('CELERY_BROKER_URL')
+    backend_url = app.config.get('CELERY_RESULT_BACKEND')
+
+    if not broker_url or not backend_url:
+        app.logger.error("CRITICAL: CELERY_BROKER_URL or CELERY_RESULT_BACKEND not found in app.config!")
+        # Use fallbacks just in case, but log the error
+        redis_url_fallback = 'redis://localhost:6379/0'
+        broker_url = broker_url or redis_url_fallback
+        backend_url = backend_url or redis_url_fallback
+
+    # Update the Celery instance directly using celery.conf.update
+    # This is the standard way to apply multiple settings.
+    celery.conf.update(
+        broker_url=broker_url,
+        result_backend=backend_url,
+        # Ensure result_extended is True if you need more detailed results (optional)
+        # result_extended=True,
+    )
+    # Also update the app config just for consistency if other parts read it
+    app.config['CELERY_BROKER_URL'] = broker_url
+    app.config['CELERY_RESULT_BACKEND'] = backend_url
+
+    print(f"--- Celery instance configured with Broker: {celery.conf.broker_url} ---")
+    print(f"--- Celery instance configured with Backend: {celery.conf.result_backend} ---")
+    # --- End Celery Configuration Update ---
 
     # Register 'before_request' hook
     @app.before_request
@@ -119,8 +145,8 @@ def create_app(config_class=Config):
 
     # Log key config values
     app.logger.info(f"Database URI: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
-    app.logger.info(f"Celery Broker URL (from env): {os.environ.get('CELERY_BROKER_URL')}") # Check env directly
-    app.logger.info(f"Celery Result Backend (from env): {os.environ.get('CELERY_RESULT_BACKEND')}") # Check env directly
+    app.logger.info(f"Celery Broker URL (from app.config): {app.config.get('CELERY_BROKER_URL')}")
+    app.logger.info(f"Celery Result Backend (from app.config): {app.config.get('CELERY_RESULT_BACKEND')}")
     app.logger.info(f"Stripe Publishable Key Loaded: {'Yes' if app.config.get('STRIPE_PUBLISHABLE_KEY') else 'No'}")
     # ... (log other keys) ...
 
