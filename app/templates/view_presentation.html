@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - SlideaAI{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">{{ presentation.title }}</h1>
+        <div>
+             {# --- ADDED EDIT BUTTON --- #}
+             <a href="{{ url_for('main.editor', presentation_id=presentation.id) }}" class="btn btn-outline-secondary">Edit Slides</a>
+             {# ----------------------- #}
+             {# --- Updated Export Button --- #}
+             <a href="{{ url_for('main.export_pptx', presentation_id=presentation.id) }}"
+                class="btn btn-primary ms-2 {% if presentation.status != PresentationStatus.VISUALS_COMPLETE %}disabled{% endif %}"
+                {% if presentation.status != PresentationStatus.VISUALS_COMPLETE %}
+                    aria-disabled="true" tabindex="-1" onclick="return false;"
+                    title="Export unavailable until visuals are complete"
+                {% else %}
+                    title="Export as PPTX"
+                    target="_blank" {# Open export in new tab #}
+                {% endif %}>
+                Export PPTX
+             </a>
+             {# --- End Updated Export Button --- #}
+             <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary ms-2">Back to Dashboard</a>
+        </div>
+    </div>
+
+    {# Card-based slide viewer #}
+    <div class="row">
+        <div class="col-lg-9 col-xl-8 offset-lg-1 offset-xl-2"> {# Wider column #}
+            {% if slides %}
+                {% for slide in slides %}
+                <div class="card slide-card mb-4 shadow-sm">
+                    <div class="row g-0">
+                        {# --- UPDATED IMAGE CONTAINER --- #}
+                        <div class="col-md-5 d-flex align-items-center justify-content-center" style="background-color: #2a2f45; border-radius: 0.375rem 0 0 0.375rem;"> {# Added background and flex centering #}
+                            {# 16:9 Aspect Ratio Container #}
+                            <div style="position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+                                {% if slide.image_url %}
+                                    <img src="{{ url_for('static', filename=slide.image_url) }}"
+                                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;" {# Changed object-fit to contain #}
+                                         class="img-fluid" {# Removed rounded-start, w-100, h-100 #}
+                                         alt="Visual for {{ slide.title or 'slide' }}"
+                                         onerror="this.onerror=null; this.src='https://placehold.co/600x400/2a3045/e0e0e0?text=Image+Error';">
+                                {% else %}
+                                    {# Placeholder within the 16:9 container #}
+                                    <div class="d-flex align-items-center justify-content-center"
+                                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #2a3045; color: #a0a3bd;">
+                                        [Visual generation pending or failed]
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {# --- END UPDATED IMAGE CONTAINER --- #}
+
+                        <div class="col-md-7"> {# Column for text #}
+                            <div class="card-body d-flex flex-column h-100">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="card-title mb-1">{{ slide.slide_number }}. {{ slide.title or "Untitled Slide" }}</h5>
+                                    {# Removed per-slide edit button for now, main button above #}
+                                    {# <a href="#" class="btn btn-sm btn-outline-light disabled ms-2">Edit</a> #}
+                                </div>
+                                <div class="slide-text-content mt-2 flex-grow-1">
+                                    {% if slide.text_content %}
+                                        {# Attempt to parse JSON, fallback to string display #}
+                                        {% set parsed_content = slide.text_content | from_json if slide.text_content.startswith('[') else slide.text_content %}
+                                        {% if parsed_content is iterable and parsed_content is not string %}
+                                            {# Display as bullet points if it's a list #}
+                                            <ul class="list-unstyled ps-3"> {# Use list-unstyled for cleaner look #}
+                                            {% for item in parsed_content %}
+                                                {% if item.strip() %} <li class="mb-1 card-text">&bull; {{ item.strip() }}</li> {% endif %}
+                                            {% endfor %}
+                                            </ul>
+                                        {% elif parsed_content is string %}
+                                             {# Display as paragraphs if it's a string #}
+                                            {% for line in parsed_content.split('\n') %}
+                                                {% if line.strip() %} <p class="mb-1 card-text">{{ line.strip() }}</p> {% endif %}
+                                            {% endfor %}
+                                        {% else %}
+                                            {# Fallback for unexpected content types #}
+                                             <p class="card-text text-muted mb-1"><em>(Could not display content)</em></p>
+                                        {% endif %}
+                                    {% else %}
+                                         <p class="card-text text-muted mb-1"><em>(No text content)</em></p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-warning" role="alert">
+                    No slides found for this presentation yet.
+                </div>
+            {% endif %}
+        </div> {# End column #}
+    </div> {# End row #}
+
+</div> {# End container #}
+{% endblock %}
+
+{# Jinja filter to safely attempt JSON parsing #}
+{% filter from_json(value) %}
+    {% if value %}
+        {% set result = value | fromjson %}
+        {% if result is defined %}{{ result }}{% else %}{{ value }}{% endif %}
+    {% else %}
+        {{ value }}
+    {% endif %}
+{% endfilter %}
+

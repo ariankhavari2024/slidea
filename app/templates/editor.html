@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - SlideaAI Editor</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    {# --- RE-ADD Webflow CSS for Navbar and Base Styles --- #}
+    <link href="{{ url_for('static', filename='css/normalize.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='css/webflow.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='css/slidea-ai-ui.webflow.css') }}" rel="stylesheet" type="text/css">
+
+    {# Fonts #}
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin="anonymous">
+    <script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js" type="text/javascript"></script>
+    <script type="text/javascript">WebFont.load({  google: {    families: ["Be Vietnam Pro:regular,500,600"]  }});</script>
+
+    {# Alpine JS #}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    {# Favicons #}
+    <link href="{{ url_for('static', filename='images/hero_img.png') }}" rel="shortcut icon" type="image/x-icon">
+    <link href="{{ url_for('static', filename='images/hero_img.png') }}" rel="apple-touch-icon">
+
+    <style>
+        /* --- Custom Editor Styles & Overrides --- */
+        :root {
+            /* Darker Theme */
+            --theme-bg: #0a0a10; /* Darker background */
+            --theme-card-bg: #111118; /* Slightly darker card */
+            --theme-border: #2a2a35; /* Adjusted border */
+            --theme-input-bg: #0a0a10; /* Match background */
+            --theme-input-border: #3a3a4a; /* Adjusted input border */
+            --theme-text-primary: #f8f9fa; /* Lighter primary text */
+            --theme-text-secondary: #adb5bd; /* Lighter secondary text */
+            --theme-accent: #9333ea; /* Purple accent */
+            --theme-accent-hover: #a855f7;
+            --theme-button-action: #4f46e5; /* Indigo */
+            --theme-button-action-hover: #6366f1;
+            --theme-button-outline: #4b5563;
+            --theme-button-outline-hover: #6b7280;
+            --theme-scrollbar-thumb: #4b5563;
+            --theme-scrollbar-track: #111118;
+            --border-radius-base: 0.5rem; /* Slightly smaller radius */
+            --border-radius-small: 0.25rem;
+        }
+        html { height: 100%; }
+        body {
+            background-color: var(--theme-bg);
+            color: var(--theme-text-secondary);
+            font-family: "Be Vietnam Pro", sans-serif; /* Ensure font applies */
+            margin: 0; display: flex; flex-direction: column; min-height: 100vh;
+            opacity: 0; transition: opacity 0.5s ease-in-out;
+            font-size: 16px; /* Ensure base font size */
+        }
+        body.loaded { opacity: 1; }
+        .page-wrapper { display: flex; flex-direction: column; flex-grow: 1; }
+
+        /* --- Webflow Navbar Adjustments (If needed) --- */
+        .navbar.w-nav { background-color: var(--theme-card-bg) !important; border-bottom: 1px solid var(--theme-border); }
+        .nav-container { max-width: 1140px; margin-left: auto; margin-right: auto; } /* Example container */
+        .nav-brand-logo { max-height: 30px; }
+
+        /* --- Editor Layout --- */
+        .editor-layout { display: flex; flex-direction: column; flex-grow: 1; padding: 1rem; /* Base padding */ overflow-x: hidden; }
+        .editor-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; margin-bottom: 1rem; background-color: var(--theme-card-bg); border: 1px solid var(--theme-border); border-radius: var(--border-radius-base); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); flex-shrink: 0; }
+        .editor-header h1 { font-size: 1.25rem; font-weight: 600; margin: 0; color: var(--theme-text-primary) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; margin-right: 1rem; margin-bottom: 0.5rem; }
+        .editor-header .button-group { display: flex; flex-wrap: wrap; gap: 0.5rem; flex-shrink: 0; margin-left: auto; align-items: center; }
+        .editor-header .btn { font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: var(--border-radius-small); transition: all 0.2s ease; border: 1px solid transparent; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; text-decoration: none; line-height: 1.4; }
+        .editor-header .btn svg { margin-right: 0.4em; width: 1em; height: 1em; }
+        .btn-export-theme { border-color: var(--theme-button-outline) !important; color: var(--theme-text-secondary) !important; background-color: transparent !important; }
+        .btn-export-theme:hover { border-color: var(--theme-accent) !important; background-color: rgba(147, 51, 234, 0.1) !important; color: var(--theme-text-primary) !important; }
+        .editor-header .btn-export-theme.disabled-link { border-color: var(--theme-border) !important; color: #6c757d !important; background-color: transparent !important; opacity: 0.65; cursor: not-allowed; pointer-events: none; }
+        .btn-back-theme { border-color: var(--theme-button-outline) !important; color: var(--theme-text-secondary) !important; background-color: transparent !important; }
+        .btn-back-theme:hover { border-color: var(--theme-text-secondary) !important; background-color: var(--theme-button-outline-hover) !important; color: var(--theme-text-primary) !important; }
+
+        /* --- Editor Content Area (Desktop) --- */
+        .editor-content-area { display: flex; flex-grow: 1; gap: 1rem; overflow: hidden; height: calc(100vh - 12rem); /* Adjusted height calc */ }
+        .editor-column { background-color: var(--theme-card-bg); border: 1px solid var(--theme-border); border-radius: var(--border-radius-base); display: flex; flex-direction: column; overflow: hidden; }
+        .editor-column-header { display: flex; justify-content: space-between; align-items: center; /* Align items in header */ color: var(--theme-text-primary) !important; font-weight: 600; font-size: 0.9rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--theme-border); background-color: rgba(0,0,0,0.2); flex-shrink: 0; }
+        .editor-column-content { padding: 1rem; overflow-y: auto; flex-grow: 1; scrollbar-width: thin; scrollbar-color: var(--theme-scrollbar-thumb) var(--theme-scrollbar-track); }
+        .editor-column-content::-webkit-scrollbar { width: 6px; height: 6px; }
+        .editor-column-content::-webkit-scrollbar-track { background: var(--theme-scrollbar-track); border-radius: 3px;}
+        .editor-column-content::-webkit-scrollbar-thumb { background-color: var(--theme-scrollbar-thumb); border-radius: 3px; }
+
+        /* --- Sidebar (Desktop) --- */
+        .editor-sidebar { flex: 0 0 260px; }
+        .editor-sidebar .editor-column-content {
+            padding: 0.75rem;
+            overflow-y: hidden; /* Disable scroll for pagination */
+        }
+        .thumbnail-list-container {
+            display: block; /* Vertical list on desktop */
+            min-height: 300px; /* Ensure space for ~4 items */
+        }
+        .thumbnail-item { cursor: pointer; margin-bottom: 0.75rem; border: 2px solid transparent; padding: 4px; border-radius: 0.4rem; transition: all 0.2s ease-in-out; position: relative; background-color: var(--theme-input-bg); }
+        .thumbnail-item:hover { border-color: var(--theme-text-secondary); }
+        .thumbnail-item.active { border-color: var(--theme-accent); }
+        .thumbnail-item img { max-width: 100%; height: auto; display: block; border-radius: 0.2rem; }
+        .thumbnail-placeholder { aspect-ratio: 16 / 9; height: auto; width: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75em; color: var(--theme-text-secondary); border: 1px dashed var(--theme-border); border-radius: 0.2rem;}
+        .slide-number-badge { position: absolute; top: 6px; left: 6px; background-color: rgba(0, 0, 0, 0.7); color: white; font-size: 0.7em; padding: 0.15em 0.4em; border-radius: 0.2rem; z-index: 1; font-weight: 600;}
+
+        /* --- Main View (Desktop) --- */
+        .editor-main-view { flex: 1 1 auto; background-color: transparent; border: none; padding: 0; display: flex; align-items: center; justify-content: center; min-width: 0; }
+        .main-slide-display { width: 100%; max-width: 100%; aspect-ratio: 16 / 9; position: relative; background-color: var(--theme-input-bg); border-radius: var(--border-radius-small); overflow: hidden; border: 1px solid var(--theme-border); }
+        .main-slide-display img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; display: block; transition: opacity 0.3s ease-in-out; }
+        .main-slide-display img.reloading { opacity: 0.5; }
+        .main-slide-visual-placeholder { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--theme-border); border-radius: var(--border-radius-small); color: var(--theme-text-secondary); font-size: 0.9rem; text-align: center; padding: 1rem;}
+        .image-loading-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(15, 23, 42, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border-radius: var(--border-radius-small); color: white; }
+        .image-loading-overlay .spinner-border { width: 3rem; height: 3rem; color: var(--theme-accent) !important; border-width: .25em; }
+        .image-loading-overlay p { margin-top: 1rem; font-size: 0.9rem; font-weight: 500; }
+
+        /* --- Controls (Desktop) --- */
+        .editor-controls { flex: 0 0 340px; }
+        .editor-controls .form-label { display: block; /* Ensure label takes full width */ color: var(--theme-text-secondary) !important; font-weight: 500; font-size: 0.85rem; margin-bottom: 0.3rem; }
+        .editor-controls .form-control { display: block; width: 100%; padding: 0.6rem 0.9rem; font-size: 0.95rem; line-height: 1.4; color: var(--theme-text-primary) !important; background-color: var(--theme-input-bg) !important; border: 1px solid var(--theme-input-border) !important; border-radius: var(--border-radius-small); transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out; margin-bottom: 1rem; }
+        .editor-controls .form-control::placeholder { color: var(--theme-text-placeholder); opacity: 1; }
+        .editor-controls .form-control:focus { border-color: var(--theme-accent) !important; outline: 0; box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.25) !important; }
+        .editor-controls textarea.form-control { min-height: 140px; height: auto; resize: vertical; }
+        .editor-controls .form-text { display: block; /* Ensure full width */ margin-bottom: 1rem; font-size: 0.75rem; color: var(--theme-text-secondary) !important; opacity: 0.8; margin-top: -0.5rem; } /* Adjusted margin */
+        .btn-regenerate { background: var(--theme-button-action); color: white !important; padding: 0.6rem 1.1rem; font-size: 0.9rem; border-radius: var(--border-radius-small); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-weight: 500; border: none; transition: all 0.2s ease; width: 100%; margin-top: 0.5rem; margin-bottom: 0.75rem; }
+        .btn-regenerate:hover { background-color: var(--theme-button-action-hover); transform: translateY(-1px); }
+        .btn-regenerate:disabled { opacity: 0.6; cursor: not-allowed; background: var(--theme-button-action) !important; transform: none; }
+        .btn-regenerate .spinner-border-sm { width: 0.9em; height: 0.9em; margin-left: 0.5em; }
+        .btn-upload-disabled { background-color: transparent !important; border: 1px dashed var(--theme-input-border) !important; color: var(--theme-text-secondary) !important; cursor: not-allowed; opacity: 0.6; padding: 0.6rem 1.1rem; font-size: 0.9rem; border-radius: var(--border-radius-small); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-weight: 500; width: 100%; }
+        .editor-controls .alert { padding: 0.5rem 1rem; margin-top: 0.75rem; font-size: 0.8rem; }
+        .alert-danger { color: var(--theme-danger) !important; background-color: rgba(244, 63, 94, 0.1) !important; border-color: rgba(244, 63, 94, 0.3) !important; }
+        .alert-success { color: var(--theme-success) !important; background-color: rgba(16, 185, 129, 0.1) !important; border-color: rgba(16, 185, 129, 0.3) !important; }
+        .alert .btn-close { padding: 0.4rem 0.6rem; font-size: 0.7rem; }
+
+        /* --- Footer --- */
+        .section-footer { background-color: var(--theme-card-bg) !important; border-top: 1px solid var(--theme-border) !important; color: var(--theme-text-secondary) !important; padding: 1rem 1.5rem !important; flex-shrink: 0; font-size: 0.8rem; text-align: center; }
+
+        /* --- Utilities --- */
+        .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
+        .disabled-link { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+        [x-cloak] { display: none !important; }
+
+        /* --- Thumbnail Pagination Controls (Visible Everywhere) --- */
+        .thumbnail-pagination {
+            display: flex; /* Show pagination controls */
+            gap: 0.5rem;
+            margin-left: auto; /* Push to the right */
+        }
+        .thumbnail-pagination button {
+            background: var(--theme-button-outline);
+            color: var(--theme-text-secondary);
+            border: none;
+            border-radius: var(--border-radius-small);
+            padding: 0.2rem 0.5rem;
+            font-size: 0.8rem;
+            line-height: 1;
+            transition: background-color 0.2s ease;
+        }
+        .thumbnail-pagination button:hover:not(:disabled) {
+            background-color: var(--theme-button-outline-hover);
+            color: var(--theme-text-primary);
+        }
+        .thumbnail-pagination button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* --- MOBILE RESPONSIVENESS --- */
+
+        @media (max-width: 991px) {
+            .editor-layout { padding: 0.75rem; } /* Reduce overall padding */
+            .editor-header { padding: 0.75rem 1rem; flex-direction: column; gap: 0.75rem; } /* Stack header items */
+            .editor-header h1 { font-size: 1.1rem; text-align: center; margin: 0; }
+            .editor-header .button-group { width: auto; justify-content: center; flex-wrap: wrap; /* Allow wrapping */ }
+            .editor-header .btn { font-size: 0.75rem; padding: 0.4rem 0.7rem; }
+
+            /* Stack columns */
+            .editor-content-area { flex-direction: column; height: auto; gap: 1rem; overflow: visible; }
+            .editor-column { height: auto; margin-bottom: 1rem; overflow: visible; }
+            .editor-column:last-child { margin-bottom: 0; }
+            .editor-column-content { overflow-y: visible; height: auto; padding: 1rem; } /* Base padding */
+
+            /* Reorder columns */
+            .editor-sidebar { order: 1; max-height: none; }
+            .editor-main-view { order: 2; min-height: 30vh; padding: 0; }
+            .editor-controls { order: 3; }
+
+            /* --- Sidebar Thumbnails - PAGINATED GRID for Mobile --- */
+            .editor-sidebar .editor-column-content {
+                display: block; /* Back to block for grid */
+                overflow-x: hidden; overflow-y: auto; /* Allow vertical scroll if grid overflows */
+                padding: 1rem; /* Padding inside content area */
+                min-height: auto; align-items: stretch;
+            }
+            .editor-sidebar .editor-column-content::-webkit-scrollbar { width: 6px; height: 6px; }
+
+            .thumbnail-list-container {
+                display: grid; /* Grid layout */
+                grid-template-columns: repeat(2, 1fr); /* *** 2 columns *** */
+                gap: 0.75rem; /* *** Adjust gap *** */
+                width: 100%; /* Take full width */
+                padding-bottom: 0;
+                min-height: 150px; /* Ensure space for 2 rows */
+            }
+            .thumbnail-item {
+                width: auto; height: auto; margin-bottom: 0; /* Grid handles gap */
+                flex-shrink: 1; padding: 4px; aspect-ratio: 16 / 9;
+            }
+            .thumbnail-item img { width: 100%; height: 100%; object-fit: cover; }
+            .thumbnail-placeholder { height: 100%; width: 100%; font-size: 0.7em; } /* Adjust placeholder */
+            .slide-number-badge { font-size: 0.65em; padding: 0.1em 0.35em; top: 5px; left: 5px; } /* Adjust badge */
+
+            /* Main slide adjustments */
+            .main-slide-display { max-height: 60vh; margin-bottom: 1rem; }
+
+            /* Controls Padding & Font Size */
+            .editor-controls .editor-column-content { padding: 1rem; } /* Ensure padding */
+            .editor-controls .form-label { font-size: 0.8rem; }
+            .editor-controls .form-text { font-size: 0.75rem; }
+            .editor-controls .form-control, .editor-controls textarea.form-control { font-size: 0.9rem; min-height: 42px; }
+            .btn-regenerate, .btn-upload-disabled { font-size: 0.85rem; padding: 0.6rem 1rem; }
+        }
+
+        @media (max-width: 479px) {
+            .editor-layout { padding: 0.5rem; }
+            .editor-header { padding: 0.5rem 0.75rem; }
+            .editor-header h1 { font-size: 1rem; }
+            .editor-header .button-group { gap: 0.5rem; justify-content: center; }
+            .editor-header .btn { font-size: 0.75rem; padding: 0.4rem 0.7rem; }
+
+            .editor-content-area { gap: 0.75rem; }
+            .editor-column { margin-bottom: 0.75rem; }
+            .editor-column-content { padding: 0.75rem; }
+            .editor-controls .editor-column-content { padding: 1rem; } /* More padding for controls */
+
+            .thumbnail-list-container {
+                 grid-template-columns: repeat(2, 1fr); /* Keep 2 columns */
+                 gap: 0.5rem;
+            }
+            .thumbnail-item { padding: 3px; }
+            .thumbnail-placeholder { font-size: 0.6em; }
+            .slide-number-badge { font-size: 0.6em; padding: 0.1em 0.3em; top: 4px; left: 4px; }
+
+            .editor-controls .form-label { font-size: 0.75rem; }
+            .editor-controls .form-text { font-size: 0.7rem; }
+            .editor-controls .form-control, .editor-controls textarea.form-control { font-size: 0.85rem; padding: 0.5rem 0.7rem; min-height: 38px; }
+            .editor-controls textarea.form-control { min-height: 80px; }
+            .btn-regenerate, .btn-upload-disabled { font-size: 0.8rem; padding: 0.6rem 0.8rem; }
+        }
+
+    </style>
+</head>
+
+<body x-data="editorController()" x-init="initEditor()" x-cloak class="loaded">
+    <div class="page-wrapper">
+
+        {# --- Webflow Navbar (Make sure this matches your base/index) --- #}
+        <div data-animation="default" data-collapse="medium" data-duration="400" data-easing="ease" data-easing2="ease" role="banner" class="navbar w-nav">
+            <div class="nav-container"> {# Use the container class from your Webflow theme #}
+                <a href="{{ url_for('main.index') }}" aria-current="page" class="nav-brand-logo-wrapper w-nav-brand"> {# Use classes from your Webflow theme #}
+                    <img src="{{ url_for('static', filename='images/Logo_New.png') }}" loading="lazy" alt="Nav Logo" class="nav-brand-logo"> {# Use classes from your Webflow theme #}
+                </a>
+                <nav role="navigation" class="nav-menu w-nav-menu"> {# Use classes from your Webflow theme #}
+                    {# --- Standard Nav Links (from your index.html) --- #}
+                    <a href="{{ url_for('main.index') }}" class="nav-link w-nav-link">Home</a>
+                    <a href="{{ url_for('main.about') }}" class="nav-link w-nav-link">About</a>
+                    <a href="{{ url_for('main.index') }}#features" class="nav-link w-nav-link">Feature</a>
+                    <a href="{{ url_for('main.contact') }}" class="nav-link w-nav-link">Contact</a>
+                    <a href="#" class="nav-link w-nav-link">Blog</a>
+                    {# --- Mobile Auth Buttons (from your index.html) --- #}
+                    <div class="nav-button-wrapper hide-desktop"> {# Use classes from your Webflow theme #}
+                        {% if current_user.is_authenticated %}
+                        <a data-wf-button--variant="base" href="{{ url_for('main.dashboard') }}" class="button-stroke w-inline-block">
+                            <div class="button"><div class="button-text">Dashboard</div></div>
+                        </a>
+                        <a data-wf-button--variant="base" href="{{ url_for('main.account') }}" class="button-stroke w-inline-block" style="margin-left: 10px;">
+                            <div class="button" style="background-color: #333;"><div class="button-text">Account</div></div>
+                        </a>
+                        {% else %}
+                        <a data-wf-button--variant="base" href="{{ url_for('main.register') }}" class="button-stroke w-inline-block">
+                            <div class="button"><div class="button-text">Get started</div></div>
+                        </a>
+                        <a data-wf-button--variant="base" href="{{ url_for('main.login') }}" class="button-stroke w-inline-block" style="margin-left: 10px;">
+                            <div class="button" style="background-color: #333;"><div class="button-text">Login</div></div>
+                        </a>
+                        {% endif %}
+                    </div>
+                </nav>
+                {# --- Desktop Auth Buttons (from your index.html) --- #}
+                <div class="nav-button-wrapper hide-tablet"> {# Use classes from your Webflow theme #}
+                    {% if current_user.is_authenticated %}
+                    <a data-wf-button--variant="base" href="{{ url_for('main.dashboard') }}" class="button-stroke w-inline-block">
+                        <div class="button"><div class="button-text">Dashboard</div></div>
+                    </a>
+                    <a data-wf-button--variant="base" href="{{ url_for('main.account') }}" class="button-stroke w-inline-block" style="margin-left: 10px;">
+                        <div class="button" style="background-color: #333;"><div class="button-text">Account</div></div>
+                    </a>
+                    {% else %}
+                    <a data-wf-button--variant="base" href="{{ url_for('main.register') }}" class="button-stroke w-inline-block">
+                        <div class="button"><div class="button-text">Get started</div></div>
+                    </a>
+                    <a data-wf-button--variant="base" href="{{ url_for('main.login') }}" class="button-stroke w-inline-block" style="margin-left: 10px;">
+                        <div class="button" style="background-color: #333;"><div class="button-text">Login</div></div>
+                    </a>
+                    {% endif %}
+                </div>
+                {# --- Mobile Menu Button (from your index.html) --- #}
+                <div data-w-id="0023d2b2-573b-2e35-09d0-c21f6fb8add5" class="nav-menu-button w-nav-button"> {# Use classes from your Webflow theme #}
+                    <div class="nav-menu-line-wrapper"> {# Use classes from your Webflow theme #}
+                        <div class="nav-menu-line top"></div><div class="nav-menu-line middle"></div><div class="nav-menu-line last"></div> {# Use classes from your Webflow theme #}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {# --- End Webflow Navbar --- #}
+
+        {# --- Main Editor Layout --- #}
+        <div class="editor-layout">
+
+            {# Editor Header #}
+            <div class="editor-header">
+                <h1>{{ title }}</h1>
+                <div class="button-group">
+                    <a href="{{ url_for('main.export_pptx', presentation_id=presentation.id) }}"
+                       class="btn btn-export-theme {% if presentation.status != PresentationStatus.VISUALS_COMPLETE %}disabled-link{% endif %}"
+                       :class="{ 'disabled-link': presentationStatus !== 'VISUALS_COMPLETE' }" {# Alpine class binding #}
+                       x-bind:aria-disabled="presentationStatus !== 'VISUALS_COMPLETE'"
+                       x-bind:tabindex="presentationStatus !== 'VISUALS_COMPLETE' ? -1 : 0"
+                       @click="if (presentationStatus !== 'VISUALS_COMPLETE') $event.preventDefault()"
+                       :title="presentationStatus !== 'VISUALS_COMPLETE' ? 'Export unavailable until visuals are complete' : 'Export as PPTX'"
+                       target="_blank">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Export PPTX
+                     </a>
+                     <a href="#" class="btn btn-export-theme disabled-link" onclick="return false;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                        Export PDF (Soon)
+                      </a>
+                     <a href="{{ url_for('main.dashboard') }}" class="btn btn-back-theme">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Dashboard
+                     </a>
+                </div>
+            </div>
+
+            {# Editor Content Area (Sidebar, Main, Controls) #}
+            <div class="editor-content-area">
+
+                {# Sidebar #}
+                <aside class="editor-column editor-sidebar">
+                    <div class="editor-column-header">
+                        <span>Slides</span>
+                        {# --- Thumbnail Pagination Controls --- #}
+                        <div class="thumbnail-pagination">
+                             <button type="button" @click="prevThumbnailPage()" :disabled="thumbnailPage === 0">
+                                 &lt; Prev
+                             </button>
+                             <button type="button" @click="nextThumbnailPage()" :disabled="(thumbnailPage + 1) * thumbnailsPerPage >= slides.length">
+                                 Next &gt;
+                             </button>
+                        </div>
+                    </div>
+                    <div class="editor-column-content">
+                        <div class="thumbnail-list-container"> {# Container for thumbnails #}
+                            <template x-for="(slide, index) in slides" :key="slide.id">
+                                <div class="thumbnail-item"
+                                     x-show="index >= thumbnailPage * thumbnailsPerPage && index < (thumbnailPage + 1) * thumbnailsPerPage"
+                                     :class="{ 'active': selectedSlideIndex === index }"
+                                     @click="selectSlide(index)"
+                                     :data-index="index">
+                                    <span class="slide-number-badge" x-text="slide.slide_number"></span>
+                                    <template x-if="slide.image_url">
+                                        <img :src="slide.image_url" :alt="'Slide ' + slide.slide_number + ' thumbnail'" loading="lazy">
+                                    </template>
+                                    <template x-if="!slide.image_url">
+                                        <div class="thumbnail-placeholder">[No Visual]</div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="!slides || slides.length === 0">
+                                <p class="text-center text-muted small p-3" style="width: 100%;">No slides found.</p> {# Ensure message takes space #}
+                            </template>
+                        </div>
+                    </div>
+                </aside>
+
+                {# Main View #}
+                <section class="editor-column editor-main-view">
+                    <template x-if="currentSlide">
+                        <div class="main-slide-display">
+                            <template x-if="currentSlide.image_url">
+                                 {# Apply reloading class if this specific slide is regenerating #}
+                                <img :src="currentSlide.image_url"
+                                     :alt="'Slide ' + currentSlide.slide_number + ' - ' + currentSlide.title"
+                                     :class="{ 'reloading': regeneratingSlideIds.includes(currentSlide.id) }">
+                            </template>
+                            <template x-if="!currentSlide.image_url">
+                                <div class="main-slide-visual-placeholder">[No Visual Available]</div>
+                            </template>
+                             {# Show overlay if this specific slide is regenerating #}
+                            <div x-show="regeneratingSlideIds.includes(currentSlide?.id)" class="image-loading-overlay" x-transition.opacity>
+                                <div class="spinner-border" role="status"> <span class="visually-hidden">Loading...</span> </div>
+                                <p>Generating new visual...</p>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!currentSlide">
+                        <p class="text-muted p-3">Select a slide thumbnail to view and edit.</p>
+                    </template>
+                </section>
+
+                {# Controls #}
+                <aside class="editor-column editor-controls">
+                    <template x-if="currentSlide">
+                        <div> {# Wrap content to allow header to be sticky if needed #}
+                            <div class="editor-column-header">Edit Slide <span x-text="currentSlide.slide_number"></span></div>
+                            <div class="editor-column-content">
+                                {# Form Content #}
+                                <div class="mb-3">
+                                    <label :for="'edit-title-' + currentSlide.id" class="form-label">Slide Title</label>
+                                    <input type="text" :id="'edit-title-' + currentSlide.id" class="form-control" x-model="currentSlide.title">
+                                </div>
+                                <div class="mb-3">
+                                    <label :for="'edit-content-' + currentSlide.id" class="form-label">Slide Content</label>
+                                    {# Use x-model.lazy to update only on blur/change event for performance #}
+                                    <textarea :id="'edit-content-' + currentSlide.id" class="form-control" rows="8" x-model.lazy="currentSlide.text_content_edit"></textarea>
+                                    <div class="form-text small">Edit text. Use new lines for bullet points.</div>
+                                </div>
+                                <div class="mb-3 pt-3 border-top" style="border-color: var(--theme-input-border) !important;">
+                                    <label :for="'edit-visual-prompt-' + currentSlide.id" class="form-label">Visual Edit Prompt (Optional)</label>
+                                    <input type="text" :id="'edit-visual-prompt-' + currentSlide.id" class="form-control mb-2" placeholder="e.g., 'Make background brighter'" x-model="regenerationPrompt">
+                                    <div x-show="editError" class="alert alert-danger" x-text="editError" x-transition.opacity.duration.300ms role="alert"></div>
+                                    <div x-show="editSuccess" class="alert alert-success" x-text="editSuccess" x-transition.opacity.duration.300ms role="alert"></div>
+                                     {# Disable button if this specific slide is regenerating #}
+                                    <button type="button" @click="saveTextAndRegenerateImage()" class="btn-regenerate" :disabled="regeneratingSlideIds.includes(currentSlide?.id)">
+                                        <span x-show="!regeneratingSlideIds.includes(currentSlide?.id)">Save Text & Regenerate Visual</span>
+                                        <span x-show="regeneratingSlideIds.includes(currentSlide?.id)">Processing...</span>
+                                        <span x-show="regeneratingSlideIds.includes(currentSlide?.id)" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    </button>
+                                    <button class="btn-upload-disabled w-100" disabled>Upload Image (Coming Soon)</button>
+                                    <div class="form-text small mt-2">Enter a prompt to guide visual regeneration, or leave blank.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!currentSlide">
+                        <div class="editor-column-content">
+                            <p class="text-muted p-3 text-center mt-5">Select a slide to enable editing.</p>
+                        </div>
+                    </template>
+                </aside>
+
+            </div> {# End editor-content-area #}
+        </div> {# End editor-layout #}
+
+        {# --- Footer --- #}
+        <footer class="section-footer text-center py-3">
+             <p class="mb-0 small">&copy; {{ now.year }} SlideaAI</p>
+        </footer>
+        {# End page-wrapper #}
+    </div>
+
+    {# Embedded JSON data for Alpine #}
+    <script id="slidesData" type="application/json">
+        {{ slides_json | safe }}
+    </script>
+    {# Webflow JS (Keep if navbar/other interactions rely on it) #}
+    <script src="https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=67f1d16c9fcb04b14e6074f2" type="text/javascript" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='js/webflow.js') }}" type="text/javascript"></script>
+
+    {# Alpine Controller Logic (Added Pagination) #}
+    <script>
+        function editorController() {
+            return {
+                slides: [],
+                selectedSlideIndex: 0,
+                currentSlide: null, // Holds the *editable copy* of the selected slide
+                regenerationPrompt: '',
+                regeneratingSlideIds: [], // Array to track IDs of slides being regenerated
+                editError: '',
+                editSuccess: '',
+                presentationStatus: '{{ presentation.status.value }}', // Get initial status from Flask
+
+                // --- Thumbnail Pagination ---
+                thumbnailPage: 0,
+                thumbnailsPerPage: 4, // Show 4 thumbnails per page
+                // --- End Thumbnail Pagination ---
+
+                getCsrfToken() {
+                    const token = document.querySelector('meta[name=csrf-token]');
+                    return token ? token.getAttribute('content') : '';
+                },
+
+                initEditor() {
+                    try {
+                        const el = document.getElementById('slidesData');
+                        this.slides = el ? JSON.parse(el.textContent) : [];
+                    } catch (e) {
+                        console.error('Error parsing slides JSON:', e);
+                        this.slides = [];
+                    }
+                    this.selectSlide(0); // Select the first slide initially
+                    // Add loaded class to body for fade-in
+                    document.body.classList.add('loaded');
+                },
+
+                // Helper to get the text content ready for the textarea
+                getTextContentForEdit(content) {
+                    if (Array.isArray(content)) {
+                        return content.join('\n'); // Join array elements with newline for textarea
+                    }
+                    return content || ''; // Return string or empty string
+                },
+
+                // Helper to process textarea content back into original format (list or string)
+                processEditedContent(editedText, originalContent) {
+                    if (Array.isArray(originalContent)) {
+                        // If original was array, split textarea back into array
+                        return editedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                    }
+                    // If original was string, keep it as string
+                    return editedText;
+                },
+
+                selectSlide(index) {
+                    if (this.slides && index >= 0 && index < this.slides.length) {
+                        this.selectedSlideIndex = index;
+                        // Create a deep copy for editing
+                        this.currentSlide = JSON.parse(JSON.stringify(this.slides[index]));
+                        // Create a separate property for the textarea binding
+                        this.currentSlide.text_content_edit = this.getTextContentForEdit(this.currentSlide.text_content);
+
+                        // Reset only edit-specific state, NOT the global regeneratingSlideIds
+                        this.regenerationPrompt = '';
+                        this.editError = '';
+                        this.editSuccess = '';
+                    } else {
+                        this.selectedSlideIndex = -1;
+                        this.currentSlide = null;
+                    }
+                    // Scroll thumbnail into view on mobile/tablet (Might need adjustment if using grid)
+                    // this.$nextTick(() => {
+                    //    const activeThumb = document.querySelector(`.thumbnail-item[data-index='${index}']`);
+                    //    if (activeThumb) {
+                    //        activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    //    }
+                    // });
+                },
+
+                saveTextAndRegenerateImage() {
+                    if (!this.currentSlide || this.regeneratingSlideIds.includes(this.currentSlide.id)) {
+                        return; // Prevent action if no slide or already regenerating
+                    }
+
+                    const slideId = this.currentSlide.id; // Store ID before potential async issues
+
+                    this.editError = '';
+                    this.editSuccess = '';
+                    this.regeneratingSlideIds.push(slideId); // Add ID to tracking array
+
+                    // Process the edited text back to its original format (list or string)
+                    const processedContent = this.processEditedContent(
+                        this.currentSlide.text_content_edit,
+                        this.slides[this.selectedSlideIndex].text_content // Compare with original format
+                    );
+
+                    const payload = {
+                        title: this.currentSlide.title,
+                        text_content: processedContent, // Send processed content
+                        edit_prompt: this.regenerationPrompt
+                    };
+
+                    fetch(`/api/slide/${slideId}/regenerate_image`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCsrfToken()
+                        },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, data })))
+                    .then(({ ok, status, data }) => {
+                        if (!ok) { throw new Error(data.message || `HTTP error! Status: ${status}`); }
+                        if (data.status === 'success' && data.new_image_url) {
+                            const newImageUrl = data.new_image_url;
+                            const cacheBustUrl = newImageUrl + '?t=' + new Date().getTime();
+
+                            // Update local data (title/text in *both* currentSlide and slides array)
+                            this.slides[this.selectedSlideIndex].title = this.currentSlide.title;
+                            this.slides[this.selectedSlideIndex].text_content = processedContent; // Store processed
+                            // Update the current editable copy *only if* the user hasn't switched slides
+                            if(this.currentSlide && this.currentSlide.id === slideId) {
+                                this.currentSlide.text_content = processedContent;
+                            }
+
+                            // Preload the new image
+                            const img = new Image();
+                            img.onload = () => {
+                                // Update the main slides array which Alpine uses for thumbnails and selecting
+                                const slideIndex = this.slides.findIndex(s => s.id === slideId);
+                                if (slideIndex !== -1) {
+                                    this.slides[slideIndex].image_url = cacheBustUrl;
+                                }
+                                // Update the currently viewed slide *only if* it's still the one being regenerated
+                                if (this.currentSlide && this.currentSlide.id === slideId) {
+                                    this.currentSlide.image_url = cacheBustUrl;
+                                    this.regenerationPrompt = ''; // Clear prompt only on success for the current slide
+                                    this.editSuccess = data.message || 'Slide updated successfully!';
+                                    setTimeout(() => { if (this.currentSlide && this.currentSlide.id === slideId) this.editSuccess = ''; }, 3500);
+                                }
+                                console.log(`New image loaded for slide ${slideId}:`, cacheBustUrl);
+                                // Remove ID from regenerating list *after* successful load
+                                this.regeneratingSlideIds = this.regeneratingSlideIds.filter(id => id !== slideId);
+                            };
+                            img.onerror = () => {
+                                console.error(`Failed to load regenerated image for slide ${slideId}:`, cacheBustUrl);
+                                // Update error message only if the failed slide is currently viewed
+                                if (this.currentSlide && this.currentSlide.id === slideId) {
+                                    this.editError = 'Failed to load the new image.';
+                                }
+                                // Remove ID from regenerating list on error
+                                this.regeneratingSlideIds = this.regeneratingSlideIds.filter(id => id !== slideId);
+                            };
+                            img.src = cacheBustUrl; // Start loading
+                        } else { throw new Error(data.message || 'Image regeneration failed.'); }
+                    })
+                    .catch(error => {
+                        console.error(`Error saving/regenerating slide ${slideId}:`, error);
+                         // Update error message only if the failed slide is currently viewed
+                        if (this.currentSlide && this.currentSlide.id === slideId) {
+                            this.editError = error.message || 'An unexpected error occurred.';
+                        }
+                        // Remove ID from regenerating list on error
+                        this.regeneratingSlideIds = this.regeneratingSlideIds.filter(id => id !== slideId);
+                    });
+                },
+
+                // --- Thumbnail Pagination Methods ---
+                nextThumbnailPage() {
+                    const maxPage = Math.ceil(this.slides.length / this.thumbnailsPerPage) - 1;
+                    if (this.thumbnailPage < maxPage) {
+                        this.thumbnailPage++;
+                    }
+                },
+                prevThumbnailPage() {
+                    if (this.thumbnailPage > 0) {
+                        this.thumbnailPage--;
+                    }
+                }
+                // --- End Thumbnail Pagination Methods ---
+            }
+        }
+
+        // --- Alert Dismissal Logic ---
+         document.addEventListener("DOMContentLoaded", function() {
+             // Use event delegation for dynamically added alerts
+             document.body.addEventListener('click', function(event) {
+                 if (event.target.matches('.alert .btn-close')) {
+                     const alertNode = event.target.closest('.alert');
+                     if (alertNode) {
+                         // Use Bootstrap's dismiss method if available (if you include BS JS)
+                         if (typeof bootstrap !== 'undefined' && bootstrap.Alert) {
+                             const bsAlert = bootstrap.Alert.getOrCreateInstance(alertNode);
+                             if (bsAlert) { bsAlert.close(); }
+                         } else { // Fallback
+                             alertNode.style.transition = 'opacity 0.15s ease-out';
+                             alertNode.style.opacity = '0';
+                             setTimeout(() => alertNode.remove(), 150);
+                         }
+                     }
+                 }
+             });
+             // Trigger fade-in
+             document.body.classList.add('loaded');
+         });
+
+    </script>
+
+</body>
+</html>

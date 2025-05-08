@@ -1,0 +1,137 @@
+# render.yaml
+# Blueprint for deploying the SlideaAI Flask application on Render
+
+services:
+  # PostgreSQL Database
+  - type: pserv # Private Service - Database
+    name: slidea-db
+    env: postgres # Use Render's managed PostgreSQL environment
+    plan: free # Start with free, upgrade later if needed (e.g., 'starter')
+    postgres:
+      version: 15 # Specify desired PostgreSQL version
+    disk:
+      name: slidea-db-data
+      sizeGB: 1 # Smallest disk size, adjust if needed
+      mountPath: /var/lib/postgresql/data
+
+  # Redis Cache/Broker
+  - type: pserv # Private Service - Cache
+    name: slidea-redis
+    env: redis # Use Render's managed Redis environment
+    plan: free # Start with free, upgrade later if needed (e.g., 'starter')
+    redis:
+      version: 7 # Specify desired Redis version
+
+  # Flask Web Service (using Gunicorn)
+  - type: web
+    name: slidea-web
+    env: docker # Build and run using the Dockerfile
+    plan: starter # Choose an appropriate plan (e.g., starter, standard) - MUST BE A PAID PLAN FOR NON-SLEEPING
+    # healthCheckPath: / # Basic health check endpoint (add one to your Flask app if needed)
+    dockerfilePath: ./Dockerfile # Path to your Dockerfile
+    # Define build context if Dockerfile is not in the root
+    # dockerContext: .
+    envVars:
+      # --- Core Flask/Python Settings ---
+      - key: PYTHON_VERSION # Optional: Specify Python version used in Dockerfile
+        value: 3.11
+      - key: FLASK_APP # Tells Flask which file starts the app
+        value: wsgi.py # Assuming you have a wsgi.py (see explanation below)
+      - key: FLASK_ENV
+        value: production # Set Flask environment to production
+      - key: SECRET_KEY
+        generateValue: true # Let Render generate a secure secret key
+      # --- Database Connection (Render provides this automatically) ---
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: slidea-db
+          property: connectionString
+      # --- Redis Connection (Render provides this automatically) ---
+      - key: REDIS_URL # Used by Celery config
+        fromService:
+          type: pserv
+          name: slidea-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL # Explicitly set for Celery
+        fromService:
+          type: pserv
+          name: slidea-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND # Explicitly set for Celery
+        fromService:
+          type: pserv
+          name: slidea-redis
+          property: connectionString
+      # --- External API Keys (Sync from Secret Files or set directly) ---
+      - key: OPENAI_API_KEY
+        sync: false # Set this directly in the Render dashboard environment secrets
+      - key: STRIPE_SECRET_KEY
+        sync: false # Set this directly in the Render dashboard environment secrets
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false # Set this directly in the Render dashboard environment secrets
+      - key: STRIPE_ENDPOINT_SECRET
+        sync: false # Set this directly in the Render dashboard environment secrets
+      - key: STRIPE_PRICE_ID_PRO # Make sure these match your .env/config.py names
+        sync: false # Set this directly in the Render dashboard environment secrets
+      - key: STRIPE_PRICE_ID_CREATOR
+        sync: false # Set this directly in the Render dashboard environment secrets
+      # --- Service Type Identification for entrypoint.sh ---
+      - key: SERVICE_TYPE
+        value: web
+      - key: IS_WEB_SERVICE # Used to control migration runs
+        value: true
+      # --- Gunicorn/Web Concurrency ---
+      # Render might set WEB_CONCURRENCY based on plan, or you can set it here
+      # - key: WEB_CONCURRENCY
+      #   value: 3 # Example, adjust based on plan/testing
+
+  # Celery Worker Service
+  - type: worker
+    name: slidea-worker
+    env: docker # Build and run using the Dockerfile
+    plan: starter # Choose an appropriate plan - MUST BE A PAID PLAN FOR NON-SLEEPING
+    dockerfilePath: ./Dockerfile
+    # dockerContext: .
+    envVars:
+      # Inherit most variables from the web service or set explicitly
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: FLASK_APP
+        value: wsgi.py # Worker still needs to know the app entry
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        fromService: # Get the same generated key as the web service
+          type: web
+          name: slidea-web
+          envVarKey: SECRET_KEY
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: slidea-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: pserv
+          name: slidea-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: pserv
+          name: slidea-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: pserv
+          name: slidea-redis
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false # Set directly in Render dashboard secrets
+      - key: STRIPE_SECRET_KEY # Worker might not need Stripe keys, but include if tasks use them
+        sync: false
+      # --- Service Type Identification for entrypoint.sh ---
+      - key: SERVICE_TYPE
+        value: worker
+      - key: IS_WEB_SERVICE # Ensure this is false or absent for the worker
+        value: false

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html data-wf-page="67f1d16c9fcb04b14e607537" data-wf-site="67f1d16c9fcb04b14e6074f2">
+<head>
+  <meta charset="utf-8">
+  <title>SlideaAI – AI-Powered Presentations in Seconds</title>
+  <meta content="Generate stunning, editable presentations instantly from a topic or your notes. SlideaAI uses AI to create content and visuals, saving you hours." name="description">
+  <meta content="SlideaAI – AI-Powered Presentations in Seconds" property="og:title">
+  <meta content="Generate stunning, editable presentations instantly from a topic or your notes. SlideaAI uses AI to create content and visuals, saving you hours." property="og:description">
+  {# Add OG Image URL if available #}
+  {# <meta content="{{ url_for('static', filename='images/og-image-slidea.png') }}" property="og:image"> #}
+  <meta content="SlideaAI – AI-Powered Presentations in Seconds" property="twitter:title">
+  <meta content="Generate stunning, editable presentations instantly from a topic or your notes. SlideaAI uses AI to create content and visuals, saving you hours." property="twitter:description">
+   {# Add Twitter Image URL if available #}
+  {# <meta content="{{ url_for('static', filename='images/twitter-image-slidea.png') }}" property="twitter:image"> #}
+  <meta property="og:type" content="website">
+  <meta content="summary_large_image" name="twitter:card">
+  <meta content="width=device-width, initial-scale=1" name="viewport">
+  <meta content="Webflow" name="generator">
+
+  {# CSRF Token Meta Tag #}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  {# Link CSS using url_for #}
+  <link href="{{ url_for('static', filename='css/normalize.css') }}" rel="stylesheet" type="text/css">
+  <link href="{{ url_for('static', filename='css/webflow.css') }}" rel="stylesheet" type="text/css">
+  <link href="{{ url_for('static', filename='css/slidea-ai-ui.webflow.css') }}" rel="stylesheet" type="text/css">
+
+  {# Fonts #}
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin="anonymous">
+  <script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js" type="text/javascript"></script>
+  <script type="text/javascript">WebFont.load({  google: {    families: ["Be Vietnam Pro:regular,500,600"]  }});</script>
+  <script type="text/javascript">!function(o,c){var n=c.documentElement,t=" w-mod-";n.className+=t+"js",("ontouchstart"in o||o.DocumentTouch&&c instanceof DocumentTouch)&&(n.className+=t+"touch")}(window,document);</script>
+
+  {# Favicons #}
+  <link href="{{ url_for('static', filename='images/custom_favicon.png') }}" rel="shortcut icon" type="image/x-icon">
+  <link href="{{ url_for('static', filename='images/custom_favicon.png') }}" rel="apple-touch-icon">
+
+  {# Optional: Add specific styles for index page if needed, but avoid navbar overrides #}
+  <style>
+      body {
+          opacity: 0;
+          transition: opacity 0.5s ease-in-out;
+          background-color: #090911; /* Ensure correct background */
+      }
+      body.loaded { opacity: 1; }
+
+       /* Credit Display Style (Keep if not global) */
+      .nav-credits {
+          color: #facc15 !important; /* Use direct color or var(--credit-color) if defined */
+          margin-left: 0.5rem;
+          margin-right: 0.5rem;
+          font-size: 0.8em;
+          font-weight: 600;
+          display: inline-flex;
+          align-items: center;
+          padding: 0.3rem 0.6rem;
+          line-height: 1;
+          text-shadow: 0 0 8px rgba(250, 204, 21, 0.5); /* Use direct color or var(--credit-glow-color) */
+          white-space: nowrap;
+      }
+      .nav-credits svg {
+          width: 0.9em; height: 0.9em;
+          margin-right: 0.3em;
+          fill: currentColor;
+          vertical-align: -0.1em;
+          filter: drop-shadow(0 0 3px rgba(250, 204, 21, 0.5));
+      }
+      /* Ensure spacing between desktop buttons (Keep if not global) */
+      .nav-button-wrapper.hide-tablet {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem; /* Adjust gap as needed */
+      }
+
+      /* Mobile Navbar Fixes */
+      @media (max-width: 991px) {
+          .nav-button-wrapper.hide-tablet { display: none !important; }
+          .nav-button-wrapper.hide-desktop {
+              display: flex !important;
+              flex-direction: row !important;
+              align-items: center !important;
+              gap: 0.5rem !important;
+              width: auto;
+              padding-top: 1rem;
+              border-top: 1px solid rgba(255, 255, 255, 0.1);
+              margin-top: 1rem;
+              margin-bottom: 0;
+              justify-content: center;
+          }
+          .nav-button-wrapper.hide-desktop .button-stroke {
+              padding: 0.5rem 0.75rem !important;
+              font-size: 0.8rem !important;
+              flex: none;
+              text-align: center;
+              margin-left: 0 !important;
+          }
+           .nav-button-wrapper.hide-desktop .button-stroke .button {
+               padding: 0 !important;
+          }
+          .nav-button-wrapper.hide-desktop .nav-credits {
+              font-size: 0.7em !important;
+              padding: 0.2rem 0.4rem !important;
+              margin: 0 !important;
+              order: -1;
+          }
+      }
+  </style>
+
+</head>
+<body class="body-fade-in loaded">
+  <div class="page-wrapper">
+    <div class="main-wrapper">
+      <div class="header-wrapper">
+        <div data-animation="default" data-collapse="medium" data-duration="400" data-easing="ease" data-easing2="ease" role="banner" class="navbar w-nav">
+          <div class="nav-container"> <a href="{{ url_for('main.index') }}" aria-current="page" class="nav-brand-logo-wrapper w-nav-brand w--current">
+                <img src="{{ url_for('static', filename='images/Logo_New.png') }}" loading="lazy" alt="SlideaAI Logo" class="nav-brand-logo">
+            </a>
+            <nav role="navigation" class="nav-menu w-nav-menu">
+              <a href="{{ url_for('main.index') }}" aria-current="page" class="nav-link w-nav-link w--current">Home</a>
+              <a href="{{ url_for('main.about') }}" class="nav-link w-nav-link">About</a>
+              <a href="{{ url_for('main.features') }}" class="nav-link w-nav-link">Feature</a>
+              <a href="{{ url_for('main.pricing') }}" class="nav-link w-nav-link">Pricing</a>
+              <a href="{{ url_for('main.contact') }}" class="nav-link w-nav-link">Contact</a>
+
+              <div class="nav-button-wrapper hide-desktop">
+                {% if current_user.is_authenticated %}
+                  <span class="nav-credits" title="Remaining Slide Credits">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-coin" viewBox="0 0 16 16"><path d="M5.5 9.511c.076.954.83 1.697 2.182 1.785V12h.6v-.709c1.4-.098 2.218-.846 2.218-1.932 0-.987-.626-1.496-1.745-1.76l-.473-.112V5.57c.6.068.982.396 1.074.85h1.052c-.076-.919-.864-1.638-2.126-1.716V4h-.6v.719c-1.195.117-2.01.836-2.01 1.853 0 .9.606 1.472 1.613 1.707l.397.098v2.034c-.615-.093-1.022-.43-1.114-.9H5.5zm2.177-2.166c-.59-.137-.91-.416-.91-.836 0-.47.345-.822.915-.925v1.76h-.005zm.692 1.193c.717.166 1.048.435 1.048.91 0 .542-.412.914-1.135.982V8.518z"/><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/><path d="M8 13.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11m0 .5A6 6 0 1 0 8 2a6 6 0 0 0 0 12"/></svg>
+                      {{ current_user.credits_remaining }}
+                  </span>
+                  <a data-wf--button--variant="base" href="{{ url_for('main.dashboard') }}" class="button-stroke w-inline-block"><div class="button"><div class="button-text">Dashboard</div></div></a>
+                  <a data-wf--button--variant="base" href="{{ url_for('main.account') }}" class="button-stroke w-inline-block"><div class="button" style="background-color: #333;"><div class="button-text">Account</div></div></a>
+                {% else %}
+                  <a data-wf--button--variant="base" href="{{ url_for('main.register') }}" class="button-stroke w-inline-block"><div class="button"><div class="button-text">Get started</div></div></a>
+                   <a data-wf--button--variant="base" href="{{ url_for('main.login') }}" class="button-stroke w-inline-block"><div class="button" style="background-color: #333;"><div class="button-text">Login</div></div></a>
+                {% endif %}
+              </div>
+            </nav>
+            <div class="nav-button-wrapper hide-tablet">
+               {% if current_user.is_authenticated %}
+                 <span class="nav-credits" title="Remaining Slide Credits">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-coin" viewBox="0 0 16 16"><path d="M5.5 9.511c.076.954.83 1.697 2.182 1.785V12h.6v-.709c1.4-.098 2.218-.846 2.218-1.932 0-.987-.626-1.496-1.745-1.76l-.473-.112V5.57c.6.068.982.396 1.074.85h1.052c-.076-.919-.864-1.638-2.126-1.716V4h-.6v.719c-1.195.117-2.01.836-2.01 1.853 0 .9.606 1.472 1.613 1.707l.397.098v2.034c-.615-.093-1.022-.43-1.114-.9H5.5zm2.177-2.166c-.59-.137-.91-.416-.91-.836 0-.47.345-.822.915-.925v1.76h-.005zm.692 1.193c.717.166 1.048.435 1.048.91 0 .542-.412.914-1.135.982V8.518z"/><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/><path d="M8 13.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11m0 .5A6 6 0 1 0 8 2a6 6 0 0 0 0 12"/></svg>
+                     {{ current_user.credits_remaining }}
+                 </span>
+                 <a data-wf--button--variant="base" href="{{ url_for('main.dashboard') }}" class="button-stroke w-inline-block"><div class="button"><div class="button-text">Dashboard</div></div></a>
+                 <a data-wf--button--variant="base" href="{{ url_for('main.account') }}" class="button-stroke w-inline-block"><div class="button" style="background-color: #333;"><div class="button-text">Account</div></div></a>
+               {% else %}
+                 <a data-wf--button--variant="base" href="{{ url_for('main.register') }}" class="button-stroke w-inline-block"><div class="button"><div class="button-text">Get started</div></div></a>
+                  <a data-wf--button--variant="base" href="{{ url_for('main.login') }}" class="button-stroke w-inline-block" style="margin-left: 10px;"><div class="button" style="background-color: #333;"><div class="button-text">Login</div></div></a>
+               {% endif %}
+            </div>
+            <div data-w-id="0023d2b2-573b-2e35-09d0-c21f6fb8add5" class="nav-menu-button w-nav-button">
+              <div class="nav-menu-line-wrapper">
+                <div class="nav-menu-line top"></div>
+                <div class="nav-menu-line middle"></div>
+                <div class="nav-menu-line last"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="section-header">
+          <div class="padding-global">
+            <div class="container-large">
+              <div data-w-id="147c84a6-78e6-5ddb-2c00-94dee3acc4ac" class="header-component">
+                <div style="-webkit-transform:translate3d(0, -73px, 0) scale3d(0.9, 0.9, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-moz-transform:translate3d(0, -73px, 0) scale3d(0.9, 0.9, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-ms-transform:translate3d(0, -73px, 0) scale3d(0.9, 0.9, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);transform:translate3d(0, -73px, 0) scale3d(0.9, 0.9, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);opacity:0" class="header-top-content-wrapper">
+                  {# *** Updated Heading *** #}
+                  <h1 class="heading-style-h1">Generate Creative Presentations with AI. Instantly.</h1>
+                   {# *** Updated CTA Link *** #}
+                   {% if current_user.is_authenticated %}
+                     <a data-wf--button--variant="base" href="{{ url_for('main.dashboard') }}" class="button-stroke w-inline-block">
+                       <div class="button"><img src="{{ url_for('static', filename='images/Button-Bg.png') }}" loading="lazy" alt="" class="button-bg-icon">
+                         <div class="button-text">Go to Dashboard</div>
+                       </div>
+                     </a>
+                   {% else %}
+                     <a data-wf--button--variant="base" href="{{ url_for('main.register') }}" class="button-stroke w-inline-block">
+                       <div class="button"><img src="{{ url_for('static', filename='images/Button-Bg.png') }}" loading="lazy" alt="" class="button-bg-icon">
+                         <div class="button-text">Get Started Free</div> {# Updated Button Text #}
+                       </div>
+                     </a>
+                   {% endif %}
+                </div>
+                <div style="opacity:0;-webkit-transform:translate3d(0, 50px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-moz-transform:translate3d(0, 50px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-ms-transform:translate3d(0, 50px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);transform:translate3d(0, 50px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0)" class="header-image-wrapper">
+                    {# *** Update Image Src & Alt Text *** #}
+                    <img src="{{ url_for('static', filename='images/new_boss.png') }}" loading="lazy" sizes="100vw" srcset="{{ url_for('static', filename='images/new_boss.png') }} 500w, {{ url_for('static', filename='images/new_boss.png') }} 800w, {{ url_for('static', filename='images/new_boss.png') }} 1082w" alt="Example presentation slides generated by SlideaAI" class="header-image">
+                  <div class="header-image-overly"></div>
+                </div>
+                <div style="opacity:0;-webkit-transform:translate3d(0, 80px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-moz-transform:translate3d(0, 80px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-ms-transform:translate3d(0, 80px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);transform:translate3d(0, 80px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0)" class="header-overly-wrapper">
+                  <div class="header-overly _01"></div> <div class="header-overly _05"></div> <div class="header-overly _06"></div> <div class="header-overly _02"></div> <div class="header-overly _3rd"></div> <div class="header-overly _4th"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="spline-scene-bg" data-w-id="366f08d1-2ddd-da17-b6ac-b5b56afcf336" data-animation-type="spline" data-spline-url="https://prod.spline.design/72vYKYIn9bfcSXps/scene.splinecode"><canvas></canvas></div>
+        <div class="header-bg-overly-wrapper"></div>
+      </div>
+
+      {# --- Brand Section - Kept as is, assuming logos are generic placeholders --- #}
+      <div class="section-brand">
+        <div class="padding-global">
+          <div class="container-large">
+            <div class="padding-section-medium">
+              <div class="brand-component">
+                <div class="brand-tracker-wrapper">
+                  <div class="brand-tracker">
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-8.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-1.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-6.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-3.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-9.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-7.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-5.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-2.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-4.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                  </div>
+                  <div class="brand-tracker">
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-8.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-1.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-6.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-3.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-9.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-7.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-5.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-2.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-4.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                  </div>
+                  <div class="brand-tracker">
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-8.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-1.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-6.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-3.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-9.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-7.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-5.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-2.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                    <div class="brand-logo-wrapper"><img src="{{ url_for('static', filename='images/Brand-Logo-4.svg') }}" loading="lazy" alt="Brand Logo Placeholder" class="brand-logo"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="brand-overly _1st"></div>
+        <div class="brand-overly _2nd"></div>
+      </div>
+
+      {# --- Feature Section --- #}
+      <div data-wf--feature--variant="base" class="section-feature" id="features"> {# Added ID #}
+        <div class="padding-global">
+          <div class="container-large">
+            <div class="padding-section-medium">
+              <div data-w-id="851ce002-91ec-651c-eb74-82e8e4e86db5" class="feature-component">
+                <div class="feature-top-content-wrapper">
+                  {# *** Updated Heading *** #}
+                  <h2 class="heading-style-h2">Powerful Features for Instant Presentations</h2>
+                </div>
+                <div class="padding-bottom padding-large"></div>
+                <div class="feature-bottom-content-wrapper">
+                  <div class="feature-card">
+                    <div class="feature-card-content-wrapper">
+                       {# *** Updated Feature 1 *** #}
+                      <h5 class="heading-style-h5">AI Content Generation</h5>
+                      <p class="text-size-small">Enter a topic and SlideaAI researches and writes relevant content, structured logically across slides using bullet points or paragraphs.</p>
+                    </div>
+                    <div class="feature-card-image-wrapper _01">
+                        {# *** Update Image Src & Alt Text *** #}
+                        <img src="{{ url_for('static', filename='images/Slide_Part.png') }}" loading="lazy" alt="AI generating slide content" class="feature-card-image">
+                    </div>
+                  </div>
+                  <div class="feature-card">
+                    <div class="feature-card-content-wrapper">
+                       {# *** Updated Feature 2 *** #}
+                      <h5 class="heading-style-h5">Intelligent Visual Design</h5>
+                      <p class="text-size-small">Choose a style or provide a custom prompt. Our AI generates unique, context-aware visuals and layouts for each slide automatically.</p>
+                    </div>
+                    <div class="feature-card-image-wrapper">
+                        {# *** Update Image Src & Alt Text *** #}
+                        <img src="{{ url_for('static', filename='images/Better_editor.png') }}" loading="lazy" alt="AI generating slide visuals" class="feature-card-image">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# --- Process Section --- #}
+      <div class="section-process">
+        <div class="padding-global">
+          <div class="container-large">
+            <div class="padding-section-medium">
+              <div data-w-id="878e0a16-c775-b210-495e-1985c0f6a82f" class="process-component">
+                <div style="-webkit-transform:translate3d(0, -42px, 0) scale3d(0.9, 0.9, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-moz-transform:translate3d(0, -42px, 0) scale3d(0.9, 0.9, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-ms-transform:translate3d(0, -42px, 0) scale3d(0.9, 0.9, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);transform:translate3d(0, -42px, 0) scale3d(0.9, 0.9, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);opacity:0" class="process-top-content-wrapper">
+                   {# *** Updated Heading *** #}
+                  <h2 class="heading-style-h2">Simple Steps to Stunning Slides</h2>
+                </div>
+                <div class="padding-bottom padding-large"></div>
+                <div class="process-bottom-content-wrapper">
+                  <div data-w-id="8ee168ef-7d13-5cc3-e271-87152c4d957b" style="opacity:0;-webkit-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-moz-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-ms-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0)" class="process-card-wrapper">
+                    <div class="process-card-number"> <div class="process-display-text">01</div> </div>
+                     {# *** Updated Step 1 *** #}
+                    <div class="process-card"> <h6 class="heading-style-h6">Provide Input</h6> <div class="text-size-small">Enter your topic or manually input slide titles and content.</div> </div>
+                  </div>
+                  <div data-w-id="dc9796ce-b979-aee2-49c6-59f7157152b4" style="opacity:0;-webkit-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-moz-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-ms-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0)" class="process-card-wrapper">
+                    <div class="process-card-number"> <div class="process-display-text">02</div> </div>
+                     {# *** Updated Step 2 *** #}
+                    <div class="process-card"> <h6 class="heading-style-h6 is-process">Choose Style</h6> <div class="text-size-small">Select a visual theme or provide a custom prompt.</div> </div>
+                  </div>
+                  <div data-w-id="d4ef1f1a-f411-7b83-50dc-f99a31e0fc56" style="opacity:0;-webkit-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-moz-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-ms-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0)" class="process-card-wrapper">
+                    <div class="process-card-number"> <div class="process-display-text">03</div> </div>
+                     {# *** Updated Step 3 *** #}
+                    <div class="process-card"> <h6 class="heading-style-h6">Generate</h6> <div class="text-size-small">Click generate and let the AI create your presentation in seconds.</div> </div>
+                  </div>
+                  <div data-w-id="3a6ea5d0-ff4a-7a4d-c873-d6c9b6e94d18" style="opacity:0;-webkit-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-moz-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-ms-transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);transform:translate3d(0, 65px, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0)" class="process-card-wrapper">
+                    <div class="process-card-number"> <div class="process-display-text">04</div> </div>
+                     {# *** Updated Step 4 *** #}
+                    <div class="process-card"> <h6 class="heading-style-h6">Edit & Export</h6> <div class="text-size-small">Refine the content and visuals, then export as PPTX.</div> </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# --- All Features Section - Updated Text --- #}
+      <div data-wf--all-feature--variant="base" class="section-all-feature">
+        <div class="padding-global">
+          <div class="container-large">
+            <div class="padding-section-medium">
+              <div data-w-id="1e57ee78-5642-c0b8-43e6-c1790da792eb" class="all-feature-component">
+                <div class="all-feature-top-content-wrapper">
+                  <h2 class="heading-style-h2">Everything You Need for AI Presentations</h2>
+                </div>
+                <div class="padding-bottom padding-large"></div>
+                <div class="w-layout-grid all-feature-grid">
+                  <div class="all-feature-card-wrapper">
+                    <div class="all-feature-card"> <div class="all-feature-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Feature-Icon-8_1Feature-Icon-8.png') }}" loading="lazy" alt="AI Icon" class="all-feature-card-icon"></div> <div class="all-feature-card-content-wrapper"> <h6 class="heading-style-h6">Topic-Based Generation</h6> <p class="text-size-small">Enter a topic, get a full presentation with facts and structure.</p> </div> </div> <div class="all-feature-card-overly"></div>
+                  </div>
+                  <div class="all-feature-card-wrapper">
+                    <div class="all-feature-card"> <div class="all-feature-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Feature-Icon-7_1Feature-Icon-7.png') }}" loading="lazy" alt="Manual Input Icon" class="all-feature-card-icon"></div> <div class="all-feature-card-content-wrapper"> <h6 class="heading-style-h6">Manual Content Input</h6> <p class="text-size-small">Provide your own titles and content for precise control.</p> </div> </div> <div class="all-feature-card-overly"></div>
+                  </div>
+                  <div class="all-feature-card-wrapper">
+                    <div class="all-feature-card"> <div class="all-feature-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Feature-Icon-6_1Feature-Icon-6.png') }}" loading="lazy" alt="Visual Style Icon" class="all-feature-card-icon"></div> <div class="all-feature-card-content-wrapper"> <h6 class="heading-style-h6">Multiple Visual Styles</h6> <p class="text-size-small">Choose from diverse themes or create your own with prompts.</p> </div> </div> <div class="all-feature-card-overly"></div>
+                  </div>
+                  <div class="all-feature-card-wrapper">
+                    <div class="all-feature-card"> <div class="all-feature-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Feature-Icon-5_1Feature-Icon-5.png') }}" loading="lazy" alt="Edit Icon" class="all-feature-card-icon"></div> <div class="all-feature-card-content-wrapper"> <h6 class="heading-style-h6">Full Slide Editor</h6> <p class="text-size-small">Easily edit text, regenerate visuals, and refine your slides.</p> </div> </div> <div class="all-feature-card-overly"></div>
+                  </div>
+                  <div class="all-feature-card-wrapper">
+                    <div class="all-feature-card"> <div class="all-feature-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Feature-Icon-4_1Feature-Icon-4.png') }}" loading="lazy" alt="Export Icon" class="all-feature-card-icon"></div> <div class="all-feature-card-content-wrapper"> <h6 class="heading-style-h6">PPTX Export</h6> <p class="text-size-small">Download your finished presentation in PowerPoint format.</p> </div> </div> <div class="all-feature-card-overly"></div>
+                  </div>
+                  <div class="all-feature-card-wrapper">
+                    <div class="all-feature-card"> <div class="all-feature-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Feature-Icon-3_1Feature-Icon-3.png') }}" loading="lazy" alt="Font Icon" class="all-feature-card-icon"></div> <div class="all-feature-card-content-wrapper"> <h6 class="heading-style-h6">Font Selection</h6> <p class="text-size-small">Choose from a wide range of fonts for your visuals.</p> </div> </div> <div class="all-feature-card-overly"></div>
+                  </div>
+                  <div class="all-feature-card-wrapper">
+                    <div class="all-feature-card"> <div class="all-feature-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Feature-Icon-2_1Feature-Icon-2.png') }}" loading="lazy" alt="Creativity Icon" class="all-feature-card-icon"></div> <div class="all-feature-card-content-wrapper"> <h6 class="heading-style-h6 all-feature">Creativity Control</h6> <p class="text-size-small">Adjust the AI's visual creativity from standard to abstract.</p> </div> </div> <div class="all-feature-card-overly"></div>
+                  </div>
+                  <div class="all-feature-card-wrapper">
+                    <div class="all-feature-card"> <div class="all-feature-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Feature-Icon-1_1Feature-Icon-1.png') }}" loading="lazy" alt="Credit Icon" class="all-feature-card-icon"></div> <div class="all-feature-card-content-wrapper"> <h6 class="heading-style-h6">Credit-Based System</h6> <p class="text-size-small">Simple pricing based on the number of slides generated.</p> </div> </div> <div class="all-feature-card-overly"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# --- Team Section - Removed or comment out if not needed --- #}
+      {#
+      <div class="section-team">
+         ... (Team section content - kept original structure for now) ...
+      </div>
+      #}
+
+      {# --- CTA Section - Updated Text & Link --- #}
+      <div data-wf--cta--variant="base" class="section-cta">
+        <div class="padding-global">
+          <div class="container-large">
+            <div class="padding-section-medium">
+              <div data-w-id="ebc88343-38cc-61f1-8a4c-c7f483da5b9d" class="cta-component">
+                <div class="cta-top-content-wrapper">
+                  <h2 class="heading-style-h2">Ready to Create Presentations Faster?</h2>
+                   {% if current_user.is_authenticated %}
+                     <a data-wf--button--variant="base" href="{{ url_for('main.create_presentation') }}" class="button-stroke w-inline-block">
+                       <div class="button"><img src="{{ url_for('static', filename='images/Button-Bg.png') }}" loading="lazy" alt="" class="button-bg-icon">
+                         <div class="button-text">Create Now</div>
+                       </div>
+                     </a>
+                   {% else %}
+                     <a data-wf--button--variant="base" href="{{ url_for('main.register') }}" class="button-stroke w-inline-block">
+                       <div class="button"><img src="{{ url_for('static', filename='images/Button-Bg.png') }}" loading="lazy" alt="" class="button-bg-icon">
+                         <div class="button-text">Try SlideaAI Free</div>
+                       </div>
+                     </a>
+                   {% endif %}
+                </div>
+                <div class="cta-image-wrapper">
+                  <div class="spline-scene" data-w-id="ebc88343-38cc-61f1-8a4c-c7f483da5ba4" data-animation-type="spline" data-spline-url="https://prod.spline.design/72vYKYIn9bfcSXps/scene.splinecode"><canvas></canvas></div>
+                </div>
+                <div class="cta-particales-wrapper">
+                  <div class="cta-particales _01"></div> <div class="cta-particales _02"></div> <div class="cta-particales _03"></div> <div class="cta-particales _04"></div> <div class="cta-particales _05"></div> <div class="cta-particales _06"></div> <div class="cta-particales _07"></div> <div class="cta-particales _08"></div> <div class="cta-particales _09"></div> <div class="cta-particales _10"></div> <div class="cta-particales _11"></div> <div class="cta-particales _12"></div> <div class="cta-particales _13"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      {# --- Pricing Section - Updated Text & Links --- #}
+      <div data-wf--price--variant="base" class="section-price" id="pricing"> {# Added ID #}
+        <div class="padding-global">
+          <div class="container-large">
+            <div class="padding-section-medium">
+              <div data-w-id="4f7efd92-dc57-7bd5-2b2d-4f013b396cc6" class="price-component">
+                <div class="price-top-content-wrapper">
+                  <h2 class="heading-style-h2">Simple Plans for Everyone</h2>
+                </div>
+                <div class="padding-bottom padding-large"></div>
+                <div class="w-layout-grid price-grid">
+                  <div class="price-card">
+                    <div class="price-card-content-wrapoper">
+                      <h5 class="heading-style-h5">Free</h5>
+                      <div class="price-card-top-content-wrapper"> <h4 class="heading-style-h4">$0</h4> <h6 class="heading-style-h6">USD</h6> <div class="text-size-regular text-color-white-200">/month</div> </div>
+                      <a data-wf--button--variant="base" href="{{ url_for('main.register') }}?plan=free" class="button-stroke w-inline-block">
+                        <div class="button"><img src="{{ url_for('static', filename='images/Button-Bg.png') }}" loading="lazy" alt="" class="button-bg-icon"> <div class="button-text">Get Started Free</div> </div>
+                      </a>
+                      <ul role="list" class="price-card-list w-list-unstyled">
+                        <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">{{ config.CREDITS_PER_PLAN.free }} Initial Credits</div> </li>
+                        <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Max 10 Slides / presentation</div> </li>
+                        <li class="price-card-list-item"> <div class="price-card-icon-wrapper _02"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Cross" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Limited Visual Styles</div> </li>
+                        <li class="price-card-list-item"> <div class="price-card-icon-wrapper _02"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Cross" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Basic Email Support</div> </li>
+                      </ul>
+                    </div>
+                    <div class="price-card-bg-image-wrapper"><img src="{{ url_for('static', filename='images/Price-Card-Bg.png') }}" loading="lazy" sizes="100vw" srcset="{{ url_for('static', filename='images/Price-Card-Bg-p-500.png') }} 500w, {{ url_for('static', filename='images/Price-Card-Bg.png') }} 577w" alt="" class="price-card-bg-image"></div>
+                  </div>
+                  <div class="price-card">
+                    <div class="price-card-content-wrapoper">
+                      <h5 class="heading-style-h5">Pro</h5>
+                      <div class="price-card-top-content-wrapper"> <h4 class="heading-style-h4">$19.99</h4> <h6 class="heading-style-h6">USD</h6> <div class="text-size-regular text-color-white-200">/month</div> </div>
+                      <a data-wf--button--variant="base" href="{{ url_for('main.pricing') }}" class="button-stroke w-inline-block"> {# Link to pricing page to handle checkout #}
+                        <div class="button"><img src="{{ url_for('static', filename='images/Button-Bg.png') }}" loading="lazy" alt="" class="button-bg-icon"> <div class="button-text">Choose Pro</div> </div>
+                      </a>
+                      <ul role="list" class="price-card-list w-list-unstyled">
+                        <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">{{ config.CREDITS_PER_PLAN.pro }} Credits / month</div> </li>
+                        <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Max 50 Slides / presentation</div> </li>
+                        <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Access to All Visual Styles</div> </li>
+                        <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Priority Email Support</div> </li>
+                      </ul>
+                    </div>
+                    <div class="price-card-bg-image-wrapper"><img src="{{ url_for('static', filename='images/Testimonail-Card-Bg.png') }}" loading="lazy" sizes="100vw" srcset="{{ url_for('static', filename='images/Testimonail-Card-Bg-p-500.png') }} 500w, {{ url_for('static', filename='images/Testimonail-Card-Bg.png') }} 551w" alt="" class="price-card-bg-image"></div>
+                  </div>
+                  <div class="price-card">
+                    <div class="price-card-content-wrapoper">
+                      <h5 class="heading-style-h5">Creator</h5>
+                      <div class="price-card-top-content-wrapper"> <h4 class="heading-style-h4">$44.99</h4> <h6 class="heading-style-h6">USD</h6> <div class="text-size-regular text-color-white-200">/month</div> </div>
+                      <a data-wf--button--variant="base" href="{{ url_for('main.pricing') }}" class="button-stroke w-inline-block"> {# Link to pricing page to handle checkout #}
+                        <div class="button"><img src="{{ url_for('static', filename='images/Button-Bg.png') }}" loading="lazy" alt="" class="button-bg-icon"> <div class="button-text">Choose Creator</div> </div>
+                      </a>
+                      <ul role="list" class="price-card-list w-list-unstyled">
+                         <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">{{ config.CREDITS_PER_PLAN.creator }} Credits / month</div> </li>
+                         <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Max 50 Slides / presentation</div> </li>
+                         <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Access to All Visual Styles</div> </li>
+                         <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Priority Support</div> </li>
+                         <li class="price-card-list-item"> <div class="price-card-icon-wrapper"><img src="{{ url_for('static', filename='images/Vector.svg') }}" loading="lazy" alt="Checkmark" class="price-card-icon"></div> <div class="text-size-regular text-color-white-200">Early Access Features</div> </li>
+                      </ul>
+                    </div>
+                    <div class="price-card-bg-image-wrapper"><img src="{{ url_for('static', filename='images/Price-Card-Bg.png') }}" loading="lazy" sizes="100vw" srcset="{{ url_for('static', filename='images/Price-Card-Bg-p-500.png') }} 500w, {{ url_for('static', filename='images/Price-Card-Bg.png') }} 577w" alt="" class="price-card-bg-image"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    {# --- Footer Section --- #}
+    <div class="section-footer">
+      <div class="padding-global">
+        <div class="container-large">
+          <div class="footer-component">
+            <div class="w-layout-grid footer-grid">
+              <div class="footer-link-wrapper">
+                <div>Home page</div>
+                <div class="footer-link-item">
+                  <a href="{{ url_for('main.index') }}" aria-current="page" class="footer-link w--current">Home</a>
+                  <a href="{{ url_for('main.about') }}" class="footer-link">About</a>
+                  <a href="{{ url_for('main.contact') }}" class="footer-link">Contact</a>
+                  <a href="#" class="footer-link">Blog</a> {# Placeholder #}
+                  <a href="#" class="footer-link">Team</a> {# Placeholder #}
+                </div>
+              </div>
+              <div id="w-node-_70a0d6c5-6e90-caf5-75c2-74efbb9851bb-bb9851a8" class="footer-link-wrapper">
+                <div>Inner page</div>
+                <div class="footer-link-item">
+                  <a href="{{ url_for('main.features') }}" class="footer-link">Feature</a>
+                  <a href="#" class="footer-link">Blog details</a> {# Placeholder #}
+                  <a href="#" class="footer-link">Team details</a> {# Placeholder #}
+                  <a href="{{ url_for('main.pricing') }}" class="footer-link">Prices</a>
+                  <a href="{{ url_for('main.register') }}" class="footer-link">Sign Up</a>
+                </div>
+              </div>
+              <div id="w-node-_70a0d6c5-6e90-caf5-75c2-74efbb9851c9-bb9851a8" class="footer-link-wrapper">
+                <div>Authentication page</div>
+                <div class="footer-link-item">
+                  <a href="{{ url_for('main.login') }}" class="footer-link">Login</a>
+                  <a href="#" class="footer-link">Forgot password</a> {# Placeholder #}
+                  <a href="#" class="footer-link">Confirm email</a> {# Placeholder #}
+                  <a href="#" class="footer-link">Terms &amp; Condition</a> {# Placeholder #}
+                  <a href="#" class="footer-link">Privacy Policy</a> {# Placeholder #}
+                </div>
+              </div>
+              <div id="w-node-_70a0d6c5-6e90-caf5-75c2-74efbb9851d7-bb9851a8" class="footer-link-wrapper">
+                <div>Utility page</div>
+                <div class="footer-link-item">
+                  <a href="#" class="footer-link">Style guide</a> {# Placeholder #}
+                  <a href="#" class="footer-link">Licenses</a> {# Placeholder #}
+                  <a href="#" class="footer-link">404 not found</a> {# Placeholder #}
+                  <a href="#" class="footer-link">Password protected</a> {# Placeholder #}
+                  <a href="#" class="footer-link">Changelog</a> {# Placeholder #}
+                </div>
+              </div>
+              <div id="w-node-_70a0d6c5-6e90-caf5-75c2-74efbb9851e5-bb9851a8" class="footer-link-item _2nd">
+                <div>Subscribe</div>
+                <div class="footer-from-block w-form">
+                   {# *** Update Form Action/Method and add CSRF *** #}
+                  <form id="email-form-footer" name="email-form-footer" data-name="Email Form Footer" method="post" class="footer-from">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input class="footer-input w-input" maxlength="256" name="email-subscribe-footer" data-name="Email Subscribe Footer" placeholder="Enter your email" type="email" id="email-subscribe-footer" required="">
+                    <button type="submit" class="button-stroke w-inline-block">
+                      <div class="button"><img loading="lazy" src="{{ url_for('static', filename='images/Button-Bg.png') }}" alt="" class="button-bg-icon">
+                        <div class="button-text">Submit</div>
+                      </div>
+                    </button>
+                  </form>
+                  <div class="success-message w-form-done"> <div class="text-block">Thank you! Your submission has been received!</div> </div>
+                  <div class="error-message w-form-fail"> <div>Oops! Something went wrong while submitting the form.</div> </div>
+                </div>
+              </div>
+            </div>
+            <div class="padding-bottom padding-xlarge"></div>
+            <div class="footer-line"></div>
+            <div class="padding-bottom padding-medium"></div>
+            <div class="footer-bottom-content-wrapper">
+               {# *** Update Copyright *** #}
+              <div class="website-link-wrapper">&copy; {{ now.year }} SlideaAI</div>
+              <div class="footer-social-link-wrapper">
+                 {# *** Update Image Src *** #}
+                <a href="https://www.instagram.com/" target="_blank" class="footer-social-link w-inline-block"><img src="{{ url_for('static', filename='images/Instagram.svg') }}" loading="lazy" alt="Instagram" class="footer-social-icon"></a>
+                <a href="https://x.com" target="_blank" class="footer-social-link w-inline-block"><img src="{{ url_for('static', filename='images/Twitter.svg') }}" loading="lazy" alt="Twitter" class="footer-social-icon"></a>
+                <a href="https://www.facebook.com/" target="_blank" class="footer-social-link w-inline-block"><img src="{{ url_for('static', filename='images/Facebook.svg') }}" loading="lazy" alt="Facebook" class="footer-social-icon"></a>
+              </div>
+              {# *** Remove or Keep Webflow Attribution *** #}
+              <div id="w-node-_70a0d6c5-6e90-caf5-75c2-74efbb9851ff-bb9851a8" class="website-link-wrapper">Powered by <a href="https://webflow.com/" target="_blank" class="website-link">Webflow</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="w-embed"></div>
+
+  {# Link JS using url_for #}
+  <script src="https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=67f1d16c9fcb04b14e6074f2" type="text/javascript" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+  <script src="{{ url_for('static', filename='js/webflow.js') }}" type="text/javascript"></script>
+  <script>
+    // Fade-in script
+    document.addEventListener("DOMContentLoaded", function() {
+      document.body.classList.add('loaded'); // Apply fade-in
+    });
+  </script>
+</body>
+</html>

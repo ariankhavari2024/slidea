@@ -1,0 +1,14 @@
+# Python environment
+venv/
+__pycache__/
+
+# Flask/Instance configs
+.env
+instance/
+
+# VSCode or editor-specific files (optional)
+.vscode/
+*.code-workspace
+
+# Mac system files (optional but helpful)
+.DS_Store
