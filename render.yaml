@@ -26,17 +26,16 @@ services:
   - type: web
     name: slidea-web
     env: docker # Build and run using the Dockerfile
-    plan: starter # Choose an appropriate plan (e.g., starter, standard) - MUST BE A PAID PLAN FOR NON-SLEEPING
-    # healthCheckPath: / # Basic health check endpoint (add one to your Flask app if needed)
-    dockerfilePath: ./Dockerfile # Path to your Dockerfile
-    # Define build context if Dockerfile is not in the root
-    # dockerContext: .
+    plan: starter # IMPORTANT: Use a paid plan (e.g., starter) for non-sleeping service
+    # healthCheckPath: / # Optional: Add a basic health check endpoint in Flask if needed
+    dockerfilePath: ./Dockerfile # Path to your Dockerfile relative to the root
+    # dockerContext: . # Optional: Specify build context if Dockerfile isn't in root
     envVars:
       # --- Core Flask/Python Settings ---
-      - key: PYTHON_VERSION # Optional: Specify Python version used in Dockerfile
+      - key: PYTHON_VERSION
         value: 3.11
-      - key: FLASK_APP # Tells Flask which file starts the app
-        value: wsgi.py # Assuming you have a wsgi.py (see explanation below)
+      - key: FLASK_APP # Tells Flask/Gunicorn where the app object is
+        value: wsgi:app # Points to the 'app' variable in 'wsgi.py'
       - key: FLASK_ENV
         value: production # Set Flask environment to production
       - key: SECRET_KEY
@@ -48,41 +47,41 @@ services:
           name: slidea-db
           property: connectionString
       # --- Redis Connection (Render provides this automatically) ---
-      - key: REDIS_URL # Used by Celery config
+      - key: REDIS_URL # Often used directly by libraries
         fromService:
           type: pserv
           name: slidea-redis
           property: connectionString
-      - key: CELERY_BROKER_URL # Explicitly set for Celery
+      - key: CELERY_BROKER_URL # Explicitly set for Celery config
         fromService:
           type: pserv
           name: slidea-redis
           property: connectionString
-      - key: CELERY_RESULT_BACKEND # Explicitly set for Celery
+      - key: CELERY_RESULT_BACKEND # Explicitly set for Celery config
         fromService:
           type: pserv
           name: slidea-redis
           property: connectionString
-      # --- External API Keys (Sync from Secret Files or set directly) ---
+      # --- External API Keys (Set these in Render Dashboard Environment Secrets) ---
       - key: OPENAI_API_KEY
-        sync: false # Set this directly in the Render dashboard environment secrets
+        sync: false # Do not sync from yaml, set in Render UI
       - key: STRIPE_SECRET_KEY
-        sync: false # Set this directly in the Render dashboard environment secrets
+        sync: false # Do not sync from yaml, set in Render UI
       - key: STRIPE_PUBLISHABLE_KEY
-        sync: false # Set this directly in the Render dashboard environment secrets
+        sync: false # Do not sync from yaml, set in Render UI
       - key: STRIPE_ENDPOINT_SECRET
-        sync: false # Set this directly in the Render dashboard environment secrets
-      - key: STRIPE_PRICE_ID_PRO # Make sure these match your .env/config.py names
-        sync: false # Set this directly in the Render dashboard environment secrets
+        sync: false # Do not sync from yaml, set in Render UI
+      - key: STRIPE_PRICE_ID_PRO
+        sync: false # Do not sync from yaml, set in Render UI
       - key: STRIPE_PRICE_ID_CREATOR
-        sync: false # Set this directly in the Render dashboard environment secrets
+        sync: false # Do not sync from yaml, set in Render UI
       # --- Service Type Identification for entrypoint.sh ---
       - key: SERVICE_TYPE
         value: web
-      - key: IS_WEB_SERVICE # Used to control migration runs
-        value: true
-      # --- Gunicorn/Web Concurrency ---
-      # Render might set WEB_CONCURRENCY based on plan, or you can set it here
+      - key: IS_WEB_SERVICE # Used by entrypoint.sh to control migration runs
+        value: "true" # Ensure value is a string true
+      # --- Gunicorn/Web Concurrency (Optional) ---
+      # Render might set WEB_CONCURRENCY based on plan, or you can uncomment to set explicitly
       # - key: WEB_CONCURRENCY
       #   value: 3 # Example, adjust based on plan/testing
 
@@ -90,7 +89,7 @@ services:
   - type: worker
     name: slidea-worker
     env: docker # Build and run using the Dockerfile
-    plan: starter # Choose an appropriate plan - MUST BE A PAID PLAN FOR NON-SLEEPING
+    plan: starter # IMPORTANT: Use a paid plan (e.g., starter) for non-sleeping service
     dockerfilePath: ./Dockerfile
     # dockerContext: .
     envVars:
@@ -98,7 +97,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.11
       - key: FLASK_APP
-        value: wsgi.py # Worker still needs to know the app entry
+        value: wsgi:app # Worker still needs to know the app entry point
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
@@ -133,5 +132,5 @@ services:
       # --- Service Type Identification for entrypoint.sh ---
       - key: SERVICE_TYPE
         value: worker
-      - key: IS_WEB_SERVICE # Ensure this is false or absent for the worker
-        value: false
+      - key: IS_WEB_SERVICE # Ensure this is explicitly false for the worker
+        value: "false" # Ensure value is a string false
