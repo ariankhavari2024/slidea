@@ -1,15 +1,11 @@
 # render.yaml
 # Blueprint for deploying the SlideaAI Flask application on Render
+# NOTE: Redis is REMOVED from this file and must be added manually in Render Dashboard.
 
 # Managed Database Definition
 databases:
   - name: slidea-db
     plan: starter # IMPORTANT: Use a paid plan for persistence.
-
-# Managed Redis Definition
-redis:
-  - name: slidea-redis
-    plan: free # Free tier is usually okay for Redis cache/broker initially
 
 # Application Services Definition
 services:
@@ -28,11 +24,10 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true
-      # DATABASE_URL and REDIS_URL are automatically injected by Render
-      - key: CELERY_BROKER_URL
-        fromEnvVar: REDIS_URL # Use the URL Render injects
-      - key: CELERY_RESULT_BACKEND
-        fromEnvVar: REDIS_URL # Use the URL Render injects
+      # DATABASE_URL is automatically injected by Render
+      # REDIS_URL MUST BE ADDED MANUALLY in Render Environment Variables
+      # --- Celery Config (Reads REDIS_URL from environment in config.py) ---
+      # Ensure config.py reads os.environ.get('REDIS_URL') for Celery config
       # --- Secrets (Set in Render UI) ---
       - key: OPENAI_API_KEY
         sync: false
@@ -70,11 +65,10 @@ services:
           type: web
           name: slidea-web
           envVarKey: SECRET_KEY
-      # DATABASE_URL and REDIS_URL are automatically injected
-      - key: CELERY_BROKER_URL
-        fromEnvVar: REDIS_URL
-      - key: CELERY_RESULT_BACKEND
-        fromEnvVar: REDIS_URL
+      # DATABASE_URL is automatically injected
+      # REDIS_URL MUST BE ADDED MANUALLY in Render Environment Variables
+      # --- Celery Config (Reads REDIS_URL from environment in config.py) ---
+      # Ensure config.py reads os.environ.get('REDIS_URL') for Celery config
       # --- Secrets (Set in Render UI) ---
       - key: OPENAI_API_KEY
         sync: false
