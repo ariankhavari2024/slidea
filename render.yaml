@@ -1,16 +1,13 @@
 # render.yaml
 # Blueprint for deploying the SlideaAI Flask application on Render
-# Using top-level keys for DB/Redis AND explicit linking within services.
+# Defining DB at top-level, Redis as keyvalue service, injecting URLs
 
 # Managed Database Definition
 databases:
   - name: slidea-db
     plan: starter # IMPORTANT: Use a paid plan for persistence.
-
-# Managed Redis Definition
-redis:
-  - name: slidea-redis
-    plan: free # Free tier is usually okay for Redis cache/broker initially
+    # databaseName: slidea_db # Optional
+    # user: slidea_user # Optional
 
 # Application Services Definition
 services:
@@ -20,13 +17,6 @@ services:
     env: docker
     plan: starter # IMPORTANT: Use a paid plan
     dockerfilePath: ./Dockerfile
-    # Explicitly link the database and redis instances defined above
-    databases:
-      - name: slidea-db # Name must match the database defined above
-        # property: connectionString # Not needed, Render injects DATABASE_URL by default
-    redis:
-      - name: slidea-redis # Name must match the redis defined above
-        # property: connectionString # Not needed, Render injects REDIS_URL by default
     envVars:
       # --- Core Flask/Python Settings ---
       - key: PYTHON_VERSION
@@ -37,13 +27,20 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true
-      # --- Database & Redis Connection ---
-      # DATABASE_URL and REDIS_URL are automatically injected by Render
-      # due to the databases: and redis: links above.
-      # Ensure your config.py reads os.environ.get('DATABASE_URL') and os.environ.get('REDIS_URL')
-      # --- Celery Config (Reads REDIS_URL from environment in config.py) ---
+      # --- Database Connection ---
+      - key: DATABASE_URL
+        fromDatabase:
+          name: slidea-db
+          property: connectionString # Standard property for databases
+      # --- Redis Connection ---
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue # Reference the type of the Redis service
+          name: slidea-redis
+          property: connectionString # Standard property for redis/keyvalue
+      # --- Celery Config (Reads REDIS_URL from environment) ---
       # NO EXPLICIT CELERY URLs NEEDED HERE if config.py uses REDIS_URL
-      # --- External API Keys (Set these in Render Dashboard Environment Secrets) ---
+      # --- Secrets (Set in Render UI) ---
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
@@ -68,15 +65,7 @@ services:
     env: docker
     plan: starter # IMPORTANT: Use a paid plan
     dockerfilePath: ./Dockerfile
-    # Explicitly link the database and redis instances defined above
-    databases:
-      - name: slidea-db # Name must match the database defined above
-        # property: connectionString # Not needed
-    redis:
-      - name: slidea-redis # Name must match the redis defined above
-        # property: connectionString # Not needed
     envVars:
-      # Inherit most variables from the web service or set explicitly
       - key: PYTHON_VERSION
         value: 3.11
       - key: FLASK_APP
@@ -85,14 +74,23 @@ services:
         value: production
       - key: SECRET_KEY
         fromService: # Get the same generated key as the web service
-          # type: web # Type is not needed here per feedback
+          type: web # Correct type for referencing web service env var
           name: slidea-web
           envVarKey: SECRET_KEY
-      # --- Database & Redis Connection (Render injects these automatically) ---
-      # DATABASE_URL and REDIS_URL are automatically injected
-      # --- Celery Config (Reads REDIS_URL from environment in config.py) ---
+      # --- Database Connection ---
+      - key: DATABASE_URL
+        fromDatabase:
+          name: slidea-db
+          property: connectionString
+      # --- Redis Connection ---
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue # Reference the type of the Redis service
+          name: slidea-redis
+          property: connectionString
+      # --- Celery Config (Reads REDIS_URL from environment) ---
       # NO EXPLICIT CELERY URLs NEEDED HERE if config.py uses REDIS_URL
-      # --- External API Keys (Set these in Render Dashboard Environment Secrets) ---
+      # --- Secrets (Set in Render UI) ---
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
@@ -102,3 +100,10 @@ services:
         value: worker
       - key: IS_WEB_SERVICE
         value: "false"
+
+  # Redis Service (Defined as Key-Value Store)
+  - type: keyvalue # Define Redis using the 'keyvalue' type
+    name: slidea-redis
+    plan: free # Free tier is usually okay for Redis cache/broker initially
+    ipAllowList: [] # Optional: Allow connections from anywhere (adjust if needed)
+    # Version is managed by Render for keyvalue type
