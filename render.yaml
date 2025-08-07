@@ -1,16 +1,15 @@
-# render.yaml
+# render.yaml (Upgraded for Production)
 # Blueprint for deploying the SlideaAI Flask application on Render
-# Using top-level keys for DB/Redis, explicit Celery Env Vars in services
 
 # Managed Database Definition
 databases:
   - name: slidea-db
-    plan: starter # IMPORTANT: Use a paid plan for persistence.
+    plan: standard # UPGRADED: From starter to standard for persistence and performance.
 
 # Managed Redis Definition
 redis:
   - name: slidea-redis
-    plan: free # Free tier is usually okay for Redis cache/broker initially
+    plan: standard # UPGRADED: From free to a paid plan for more memory.
 
 # Application Services Definition
 services:
@@ -18,8 +17,14 @@ services:
   - type: web
     name: slidea-web
     env: docker
-    plan: starter # IMPORTANT: Use a paid plan
+    plan: standard # UPGRADED: From starter to handle more user traffic.
     dockerfilePath: ./Dockerfile
+    # Add auto-scaling rules here for production
+    scaling:
+      minInstances: 1
+      maxInstances: 3 # Example: scale up to 3 instances under load
+      targetMemoryPercent: 70 # Example: scale up if memory usage is > 70%
+      targetCPUPercent: 70 # Example: scale up if CPU usage is > 70%
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
@@ -29,13 +34,13 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true
+      - key: WEB_CONCURRENCY
+        value: "4" # Set based on your plan's CPU count (e.g., Standard has 2 vCPU, so (2*2)+1=5 is a good start)
       # --- Database & Redis Connection ---
-      # DATABASE_URL and REDIS_URL are automatically injected by Render
-      # --- Explicit Celery Config using Render's REDIS_URL ---
       - key: CELERY_BROKER_URL
-        fromEnvVar: REDIS_URL # Explicitly set CELERY_BROKER_URL from injected REDIS_URL
+        fromEnvVar: REDIS_URL
       - key: CELERY_RESULT_BACKEND
-        fromEnvVar: REDIS_URL # Explicitly set CELERY_RESULT_BACKEND from injected REDIS_URL
+        fromEnvVar: REDIS_URL
       # --- Secrets (Set in Render UI) ---
       - key: OPENAI_API_KEY
         sync: false
@@ -59,13 +64,19 @@ services:
   - type: worker
     name: slidea-worker
     env: docker
-    plan: starter # IMPORTANT: Use a paid plan
+    plan: standard # UPGRADED: From starter to process AI tasks faster.
     dockerfilePath: ./Dockerfile
+    # Add auto-scaling rules here for production
+    scaling:
+      minInstances: 1
+      maxInstances: 5 # Example: scale up to 5 workers if queue is long
+      targetMemoryPercent: 70
+      targetCPUPercent: 70
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
       - key: FLASK_APP
-        value: wsgi:app # Worker still needs app context
+        value: wsgi:app
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
@@ -73,19 +84,15 @@ services:
           name: slidea-web
           envVarKey: SECRET_KEY
       # --- Database & Redis Connection ---
-      # DATABASE_URL and REDIS_URL are automatically injected
-      # --- Explicit Celery Config using Render's REDIS_URL ---
       - key: CELERY_BROKER_URL
-        fromEnvVar: REDIS_URL # Explicitly set CELERY_BROKER_URL from injected REDIS_URL
+        fromEnvVar: REDIS_URL
       - key: CELERY_RESULT_BACKEND
-        fromEnvVar: REDIS_URL # Explicitly set CELERY_RESULT_BACKEND from injected REDIS_URL
+        fromEnvVar: REDIS_URL
       # --- Secrets (Set in Render UI) ---
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
-      # --- ADDED MISSING STRIPE PRICE IDs FOR WORKER ---
-      # These are needed so config.py can build PLAN_NAME_MAP in the worker
       - key: STRIPE_PRICE_ID_PRO
         sync: false
       - key: STRIPE_PRICE_ID_CREATOR
