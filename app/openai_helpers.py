@@ -48,27 +48,23 @@ def log_prompt_to_file(log_type, prompt_data):
         current_app.logger.error(f"Error during prompt logging: {e}", exc_info=True)
 
 
-# --- generate_text_content (UPDATED with stricter slide count instructions) ---
+# --- generate_text_content (No changes needed) ---
 def generate_text_content(topic: str, text_style: str = 'bullet', desired_slide_count: int = 10, presenter_name: str | None = None) -> list[dict]:
     """
     Generates structured slide text content using OpenAI API.
-    The first slide will contain only the title and presenter name (if provided).
-    Subsequent slides will contain generated content based on the text_style.
-    *** NOW WITH STRICTER SLIDE COUNT ADHERENCE ***
     """
     client = get_openai_client()
     response_content = "[No response content obtained]"
     json_string = "[JSON not extracted]"
 
-    # Determine instructions for slides *after* the first one
     if text_style == 'bullet':
         style_instruction_subsequent = "a JSON list of short, informative bullet points (5-6 concise bullets, max 15-20 words each)"
         content_format_example_subsequent = '"slide_content": ["Co-founded Apple with Steve Wozniak in 1976", "Revolutionized personal computing with Macintosh", "Led Pixar to animation success", "Introduced iPod, iPhone, iPad changing industries", "Known for design focus and reality distortion field"]'
-        first_slide_content_value = [] # Empty list for bullet style
+        first_slide_content_value = []
     elif text_style == 'paragraph':
         style_instruction_subsequent = "a single, coherent string paragraph (one clear paragraph, approx. 60-90 words)"
         content_format_example_subsequent = '"slide_content": "Padel, a dynamic blend of tennis and squash, is rapidly gaining global popularity. Played on an enclosed court with walls integral to gameplay, it emphasizes social interaction and strategy. Typically played in doubles with underhand serves, it\'s accessible yet offers depth. Its ease of learning, social nature, and fitness benefits contribute to its worldwide explosion."'
-        first_slide_content_value = f"By: {presenter_name.strip()}" if presenter_name and presenter_name.strip() else "" # Presenter name or empty string
+        first_slide_content_value = f"By: {presenter_name.strip()}" if presenter_name and presenter_name.strip() else ""
     else:
         current_app.logger.warning(f"Unrecognized text_style '{text_style}', defaulting to bullet points.")
         text_style = 'bullet'
@@ -76,7 +72,6 @@ def generate_text_content(topic: str, text_style: str = 'bullet', desired_slide_
         content_format_example_subsequent = '"slide_content": ["Co-founded Apple with Steve Wozniak in 1976", "Revolutionized personal computing with Macintosh", "Led Pixar to animation success", "Introduced iPod, iPhone, iPad changing industries", "Known for design focus and reality distortion field"]'
         first_slide_content_value = []
 
-    # *** UPDATED System Prompt (Stricter Slide Count) ***
     system_prompt = f"""
 You are an expert presentation creator AI, tasked with generating accurate, engaging, and well-structured slide content for a presentation about "{topic}".
 Generate content for **EXACTLY** {desired_slide_count} slide(s) in total. This is a strict requirement.
@@ -111,7 +106,6 @@ Return the content in this **exact JSON format**: a single JSON list where each 
     "slide_title": "Example Subsequent Title 1",
     "slide_content": {content_format_example_subsequent}
   }}
-  // ... potentially more slides up to EXACTLY {desired_slide_count}
 ]
 
 **Example Output Format (if desired_slide_count is 1):**
@@ -140,12 +134,12 @@ Return the content in this **exact JSON format**: a single JSON list where each 
     try:
         current_app.logger.info(f"Requesting text content V6 for topic: '{topic}' (Style: {text_style}, EXACT Count: {desired_slide_count})")
         completion = client.chat.completions.create(
-            model="gpt-4.1-nano", # Or your preferred model
+            model="gpt-4.1-nano",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.6, # Slightly lower temperature might help adherence
+            temperature=0.6,
         )
         response_content = completion.choices[0].message.content
         current_app.logger.debug(f"Raw OpenAI text response received.")
@@ -153,7 +147,6 @@ Return the content in this **exact JSON format**: a single JSON list where each 
         if not response_content:
             raise ValueError("AI returned an empty text response.")
 
-        # Attempt to extract JSON robustly
         json_string = response_content
         if json_string.startswith("```json"): json_string = json_string[7:]
         if json_string.startswith("```"): json_string = json_string[3:]
@@ -177,19 +170,11 @@ Return the content in this **exact JSON format**: a single JSON list where each 
         actual_content_count = len(slides_data)
         log_prompt_to_file("Text Generation Response Info", f"Topic: {topic}\nDesired Count: {desired_slide_count}\nActual Count Received: {actual_content_count}")
 
-        # *** ADDED: Check if the count matches exactly ***
         if actual_content_count != desired_slide_count:
-            current_app.logger.warning(f"AI slide count MISMATCH! Requested: {desired_slide_count}, Got: {actual_content_count}. Will truncate or pad if possible, but this indicates a prompt adherence issue.")
-            # Optionally, you could truncate the list if it's too long:
-            # slides_data = slides_data[:desired_slide_count]
-            # Or raise an error if exact count is critical:
-            # raise ValueError(f"AI did not generate the exact number of slides requested ({desired_slide_count}). Got {actual_content_count}.")
-            # For now, we'll proceed with validation but log the warning.
+            current_app.logger.warning(f"AI slide count MISMATCH! Requested: {desired_slide_count}, Got: {actual_content_count}.")
 
-        # VALIDATE AND NORMALIZE
         validated_slides = []
         for i, slide in enumerate(slides_data):
-             # Stop processing if we already have the desired number (handles truncation case)
             if len(validated_slides) >= desired_slide_count:
                 break
 
@@ -204,20 +189,17 @@ Return the content in this **exact JSON format**: a single JSON list where each 
 
             if 'slide_title' not in slide: slide['slide_title'] = keys_lower['slide_title']
             if 'slide_content' not in keys_lower:
-                 current_app.logger.warning(f"Slide object at index {i} missing 'slide_content'. Setting to default.")
-                 slide['slide_content'] = "" if text_style == 'paragraph' else []
+                current_app.logger.warning(f"Slide object at index {i} missing 'slide_content'. Setting to default.")
+                slide['slide_content'] = "" if text_style == 'paragraph' else []
             elif 'slide_content' not in slide:
-                 slide['slide_content'] = keys_lower['slide_content']
+                slide['slide_content'] = keys_lower['slide_content']
 
-            # Assign slide number based on its position in the *validated* list
             slide['slide_number'] = len(validated_slides) + 1
 
-            # Enforce First Slide Content
             if slide['slide_number'] == 1:
                 slide['slide_content'] = first_slide_content_value
                 if not slide['slide_title'] or slide['slide_title'] == "Example Title 1":
                     slide['slide_title'] = f"Presentation on: {topic}"
-            # Normalize content for subsequent slides
             elif slide['slide_number'] > 1:
                 content = slide['slide_content']
                 if text_style == 'bullet':
@@ -234,30 +216,19 @@ Return the content in this **exact JSON format**: a single JSON list where each 
             validated_slides.append(slide)
 
         if not validated_slides:
-             raise ValueError("No valid slide data could be extracted from the AI response.")
+            raise ValueError("No valid slide data could be extracted from the AI response.")
 
-        # Final check if the validated count matches desired (especially if truncation happened)
         if len(validated_slides) != desired_slide_count:
-             current_app.logger.warning(f"Final validated slide count ({len(validated_slides)}) still differs from desired ({desired_slide_count}).")
-
+            current_app.logger.warning(f"Final validated slide count ({len(validated_slides)}) still differs from desired ({desired_slide_count}).")
 
         current_app.logger.info(f"Successfully parsed and validated {len(validated_slides)} slides from AI text response.")
-        return validated_slides # Return the validated (potentially truncated) list
+        return validated_slides
 
     except json.JSONDecodeError as e:
         current_app.logger.error(f"JSON Decode Error: {e}. Response content: {json_string[:500]}...")
         raise ValueError("AI response was not valid JSON.") from e
-    except RateLimitError as e:
-        current_app.logger.error(f"OpenAI Rate Limit Error: {e}")
-        raise ConnectionError("OpenAI API rate limit exceeded.") from e
-    except APIConnectionError as e:
-        current_app.logger.error(f"OpenAI Connection Error: {e}")
-        raise ConnectionError("Failed to connect to OpenAI API.") from e
-    except APIStatusError as e:
-        current_app.logger.error(f"OpenAI API Status Error: Status={e.status_code}, Response={e.response}")
-        raise ConnectionError(f"OpenAI API returned an error (Status {e.status_code}).") from e
-    except OpenAIError as e:
-        current_app.logger.error(f"OpenAI API Error: {e}")
+    except (RateLimitError, APIConnectionError, APIStatusError, OpenAIError) as e:
+        current_app.logger.error(f"OpenAI API Error during text generation: {e}")
         raise ConnectionError("An error occurred communicating with OpenAI API.") from e
     except ValueError as e:
         current_app.logger.error(f"Data validation error: {e}")
@@ -271,7 +242,6 @@ Return the content in this **exact JSON format**: a single JSON list where each 
 def generate_missing_slide_content(slide_title: str, text_style: str = 'bullet', presentation_topic: str | None = None) -> str | list:
     """
     Generates content for a single slide when manually entered content is blank.
-    Now includes presentation_topic for context.
     """
     client = get_openai_client()
     current_app.logger.info(f"Generating missing content for slide title: '{slide_title}' (Style: {text_style}, Topic: '{presentation_topic}')")
@@ -279,11 +249,9 @@ def generate_missing_slide_content(slide_title: str, text_style: str = 'bullet',
     if text_style == 'bullet':
         style_instruction = "a JSON list of short, informative bullet points (5-6 concise bullets, max 15-20 words each) relevant to the slide title"
         content_format_example = '["Point 1 about the title", "Point 2", "Point 3", "Point 4", "Point 5"]'
-        expected_type = list
     else: # paragraph
         style_instruction = "a single, coherent string paragraph (one clear paragraph, approx. 60-90 words) expanding on the slide title"
         content_format_example = '"A concise paragraph explaining the key idea of the slide title..."'
-        expected_type = str
 
     system_prompt = f"""
 You are an AI assistant helping to fill in missing presentation content.
@@ -299,7 +267,7 @@ Example Format ({text_style}): {content_format_example}
 
     try:
         completion = client.chat.completions.create(
-            model="gpt-4.1-nano", # Or a faster/cheaper model if suitable
+            model="gpt-4.1-nano",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -333,8 +301,8 @@ Example Format ({text_style}): {content_format_example}
                 return [line.strip() for line in response_content.split('\n') if line.strip()] or [" "]
         else: # Paragraph style
             if not isinstance(response_content, str):
-                 current_app.logger.warning(f"AI response for paragraph was not a string for title '{slide_title}'. Type: {type(response_content)}")
-                 return "[AI content generation error]"
+                current_app.logger.warning(f"AI response for paragraph was not a string for title '{slide_title}'. Type: {type(response_content)}")
+                return "[AI content generation error]"
             return response_content
 
     except Exception as e:
@@ -370,10 +338,10 @@ def parse_manual_content(script_text: str) -> list[dict]:
         slides_data = []
         slide_blocks = [block for block in script_text.strip().split('\n\n') if block.strip()]
         if len(slide_blocks) <= 1:
-             block_lines = script_text.strip().split('\n')
-             title = block_lines[0].strip() if block_lines else "Manual Input Slide 1"
-             content_lines = [l.rstrip() for l in block_lines[1:]]
-             slides_data.append({"slide_title": title, "slide_content": content_lines})
+            block_lines = script_text.strip().split('\n')
+            title = block_lines[0].strip() if block_lines else "Manual Input Slide 1"
+            content_lines = [l.rstrip() for l in block_lines[1:]]
+            slides_data.append({"slide_title": title, "slide_content": content_lines})
         else:
             for i, block in enumerate(slide_blocks):
                 block_lines = block.split('\n'); title = block_lines[0].strip() if block_lines else f"Manual Input Slide {i+1}"
@@ -385,7 +353,7 @@ def parse_manual_content(script_text: str) -> list[dict]:
 
 # --- VISUAL GENERATION HELPERS ---
 
-# --- get_style_description (No changes needed for custom logic) ---
+# --- get_style_description (No changes needed) ---
 def get_style_description(style_key_or_prompt: str) -> str:
     """Returns a detailed description for predefined styles, or the prompt itself if custom."""
     style_map = {
@@ -398,15 +366,13 @@ def get_style_description(style_key_or_prompt: str) -> str:
         'pencil_paper': "Hand-drawn pencil sketch style on textured paper background. Monochrome or limited color palette (e.g., graphite grey, sepia tones). Illustrations should look sketched. IMPORTANT: Text elements (title, body) should appear as if written in pencil or simple handwriting font.",
         'claymorphism_3d': "Soft, rounded 3D claymorphism style. Elements appear like smooth clay or plasticine objects with soft shadows and inner/outer extrusion effects. Pastel or muted color palette. Playful, tactile feel. Use a friendly, rounded sans-serif font.",
     }
-    # If the input key is in the map, return the description.
-    # Otherwise, assume the input *is* the custom prompt and return it directly.
     return style_map.get(style_key_or_prompt, style_key_or_prompt)
 
 
-# --- build_image_prompt (No changes needed for custom style logic) ---
+# --- build_image_prompt (No changes needed) ---
 def build_image_prompt(slide_title: str,
                        slide_content: str | list | None,
-                       style_description: str, # This will contain the custom prompt if style_choice was 'custom'
+                       style_description: str,
                        text_style: str,
                        slide_number: int,
                        total_slides: int,
@@ -416,11 +382,8 @@ def build_image_prompt(slide_title: str,
                        presenter_name: str | None = None
                        ) -> str:
     """
-    Builds image prompt instructing AI to generate visual *with* text for a 3:2 aspect ratio slide.
-    Handles first slide differently (only title + presenter name).
-    Correctly uses the provided `style_description` whether it's predefined or custom.
+    Builds image prompt instructing AI to generate visual *with* text for a slide.
     """
-    # (Logic remains the same as previous version - openai_helpers_v4)
     is_first_slide = (slide_number == 1)
     is_last_slide = (slide_number == total_slides)
     title_lower = slide_title.lower() if slide_title else ""
@@ -456,10 +419,10 @@ def build_image_prompt(slide_title: str,
         elif isinstance(slide_content, str) and slide_content.strip():
             content_type_description = "paragraph"; body_content_text = slide_content; has_body_content = True; visual_content_hint += f" - {slide_content[:80]}..."
         else:
-             content_type_description = f"content area (layout suitable for {text_style})"
-             body_content_text = ""
-             has_body_content = False
-             visual_content_hint = f"visual representing '{slide_title}' (no body text provided)"
+            content_type_description = f"content area (layout suitable for {text_style})"
+            body_content_text = ""
+            has_body_content = False
+            visual_content_hint = f"visual representing '{slide_title}' (no body text provided)"
 
     layout_description = ""
     text_area_description = "a clearly defined area with high contrast against its background (e.g., a solid panel, shape, or clean zone of the visual)"
@@ -484,7 +447,7 @@ def build_image_prompt(slide_title: str,
             layout_description = layout_description.replace(f"within {text_area_description}", "")
             layout_description += " Ensure ample space for the visual."
 
-    augmented_style = style_description # This already contains the custom prompt if applicable
+    augmented_style = style_description
     if 1 <= creativity_score <= 3: augmented_style += " Standard, clear, conventional slide design."
     elif 4 <= creativity_score <= 7: augmented_style += " Professional, well-composed visual. Balanced design."
     elif 8 <= creativity_score <= 10: augmented_style += " Highly creative, artistic interpretation. Apple Keynote aesthetic, cinematic lighting, dynamic composition, unique visual metaphors. High-end design."
@@ -497,7 +460,7 @@ def build_image_prompt(slide_title: str,
 
     prompt += f"4. **Overall Style:** Adhere strictly to: '{augmented_style}'.\n"
     prompt += f"5. **Font & Text Size:** Use font '{font_choice}' consistently. Ensure EXCELLENT readability. CRITICAL: Adjust text size appropriately (e.g., larger title, smaller body/name) so ALL content fits comfortably well within its designated area based on the layout ({layout_description}). AVOID text overflow, cutoff, or text being excessively large or small for its area. Add reasonable padding around text blocks - text MUST NOT touch the edges of its container or the slide borders.\n"
-    if "pencil sketch style" in style_description.lower() or "pencil & paper" in style_description.lower(): prompt += f"   * SPECIAL INSTRUCTION FOR PENCIL STYLE: Make the text (title, body content) appear as if written neatly with a pencil or a simple handwriting font. It should look hand-drawn but legible.\n"
+    if "pencil sketch style" in style_description.lower() or "pencil & paper" in style_description.lower(): prompt += f"    * SPECIAL INSTRUCTION FOR PENCIL STYLE: Make the text (title, body content) appear as if written neatly with a pencil or a simple handwriting font. It should look hand-drawn but legible.\n"
     prompt += f"6. **Layout & Readability:** Arrange elements harmoniously: '{layout_description}'. CRITICAL: Place ALL text (title, body, name) fully inside dedicated areas with HIGH CONTRAST against the background.\n"
     prompt += f"7. **Safe Zone & Padding:** ABSOLUTELY CRITICAL - Ensure ALL text and vital parts of the visual are placed well within the central 90-95% of the 3:2 image canvas. DO NOT place text or essential visual elements touching or extremely close to the absolute edges (top, bottom, left, right). Leave generous padding around text and away from borders.\n"
     prompt += f"8. **Colors:** Use colors consistent with style description.\n"
@@ -514,47 +477,57 @@ def build_image_prompt(slide_title: str,
     return final_prompt
 
 
-# --- generate_slide_image (No changes needed) ---
+# --- generate_slide_image (FIXED) ---
 def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: int) -> tuple[str | None, str]:
     """
-    Generates and saves a slide image using gpt-image-1 via the images endpoint,
-    handling the base64 JSON response. Uses 1536x1024 (3:2 ratio).
+    Generates and saves a slide image using DALL-E 3,
+    handling the base64 JSON response.
     """
     client = get_openai_client()
     saved_path_relative = None
     save_path_full = "[Path not determined]"
     actual_prompt_used = image_prompt
-    revised_prompt = "[N/A for gpt-image-1]"
+    revised_prompt = "[N/A for this model]"
 
-    log_prompt_to_file("Image Generation Request (gpt-image-1)", {"Prompt Sent": image_prompt})
+    log_prompt_to_file("Image Generation Request (dall-e-3)", {"Prompt Sent": image_prompt})
 
     try:
-        model_to_use = "gpt-image-1"
+        # FIX 1: Correct model name
+        model_to_use = "dall-e-3"
         current_app.logger.info(f"Generating image ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number} via images endpoint...")
         response = client.images.generate(
             model=model_to_use,
             prompt=image_prompt,
             n=1,
-            size="1536x1024",
-            quality="high"
+            # FIX 2: Use a supported landscape size (1792x1024 is closest to 16:9)
+            size="1792x1024",
+            # FIX 3: Use the correct quality parameter
+            quality="hd",
+            # Ensure response is base64 encoded
+            response_format="b64_json"
         )
 
         image_base64 = None
         if response.data and response.data[0].b64_json:
             image_base64 = response.data[0].b64_json
+            # Get the revised prompt for logging/debugging if available
+            revised_prompt = response.data[0].revised_prompt or "[No revised prompt provided]"
             current_app.logger.info(f"Base64 image data received for Pres:{presentation_id} Slide:{slide_number}.")
-            log_prompt_to_file("Image Generation Response Info (gpt-image-1)", f"Pres ID: {presentation_id}, Slide: {slide_number}\nResponse format: b64_json (Default)")
+            log_prompt_to_file("Image Generation Response Info (dall-e-3)", f"Pres ID: {presentation_id}, Slide: {slide_number}\nRevised Prompt: {revised_prompt}")
         else:
             current_app.logger.error(f"OpenAI response missing image data (b64_json) for Pres:{presentation_id} Slide:{slide_number}. Response: {response}")
             raise ValueError("API response did not contain expected b64_json image data.")
 
         if image_base64:
-            try: image_bytes = base64.b64decode(image_base64)
+            try:
+                image_bytes = base64.b64decode(image_base64)
             except (TypeError, base64.binascii.Error) as decode_error:
                 current_app.logger.error(f"Base64 Decode Error for Pres:{presentation_id} Slide:{slide_number}: {decode_error}")
                 raise ValueError("Failed to decode base64 image data.") from decode_error
 
-            if not os.path.exists(current_app.static_folder): os.makedirs(current_app.static_folder)
+            if not os.path.exists(current_app.static_folder):
+                os.makedirs(current_app.static_folder)
+            
             base_upload_folder = os.path.join(current_app.static_folder, 'uploads')
             presentation_folder = os.path.join(base_upload_folder, str(presentation_id))
             os.makedirs(presentation_folder, exist_ok=True)
@@ -565,7 +538,8 @@ def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: 
             current_app.logger.info(f"Attempting to save decoded image bytes to: {save_path_full}")
 
             try:
-                with open(save_path_full, 'wb') as f: f.write(image_bytes)
+                with open(save_path_full, 'wb') as f:
+                    f.write(image_bytes)
                 bytes_written = len(image_bytes)
                 if os.path.exists(save_path_full) and bytes_written > 0:
                     saved_path_relative = os.path.join('uploads', str(presentation_id), filename).replace(os.path.sep, '/')
@@ -577,8 +551,8 @@ def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: 
                 current_app.logger.error(f"Error saving image file for Pres:{presentation_id} Slide:{slide_number} to path {save_path_full}: {e}")
                 saved_path_relative = None
         else:
-             current_app.logger.error(f"Image base64 data was unexpectedly None for Pres:{presentation_id} Slide:{slide_number}")
-             saved_path_relative = None
+            current_app.logger.error(f"Image base64 data was unexpectedly None for Pres:{presentation_id} Slide:{slide_number}")
+            saved_path_relative = None
 
     except RateLimitError as e:
         current_app.logger.error(f"OpenAI Rate Limit Error ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: {e}")
@@ -587,10 +561,10 @@ def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: 
         current_app.logger.error(f"OpenAI Connection Error ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: {e}")
         raise
     except APIStatusError as e:
-         current_app.logger.error(f"OpenAI API Status Error ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: Status={e.status_code}, Response={e.response}")
-         if e.status_code == 404: current_app.logger.error(f"Model '{model_to_use}' not found or access denied.")
-         elif e.status_code == 400: current_app.logger.error(f"Bad Request (400) calling {model_to_use}. Check API parameters or prompt content. Details: {e.response}")
-         raise
+        current_app.logger.error(f"OpenAI API Status Error ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: Status={e.status_code}, Response={e.response}")
+        if e.status_code == 404: current_app.logger.error(f"Model '{model_to_use}' not found or access denied.")
+        elif e.status_code == 400: current_app.logger.error(f"Bad Request (400) calling {model_to_use}. Check API parameters or prompt content. Details: {e.response}")
+        raise
     except OpenAIError as e:
         current_app.logger.error(f"OpenAI API Error ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: {e}")
         raise
@@ -601,4 +575,6 @@ def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: 
         current_app.logger.error(f"Unexpected error in generate_slide_image ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: {e}", exc_info=True)
         saved_path_relative = None
 
-    return saved_path_relative, image_prompt
+    # Return the path and the *actual* prompt used by the API
+    return saved_path_relative, revised_prompt
+
