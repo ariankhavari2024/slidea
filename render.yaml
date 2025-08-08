@@ -1,18 +1,13 @@
-# Slidea — Render blueprint (Hobby-friendly, Web + Worker + Postgres + KeyValue + MinIO)
+# Slidea — Render blueprint (Hobby-friendly, uses existing DB, keeps Redis=standard)
 
-databases:
-  - name: slidea-db
-    plan: starter
-    # Lock this down later in prod
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: allow all (dev)
+# NOTE: We are NOT creating the database here to avoid legacy plan errors.
+# Make sure you already have a DB named "slidea-db" in the dashboard.
 
 services:
-  # Redis-compatible store (for Celery broker/result)
+  # Redis-compatible store (existing instance is Standard; keep it)
   - type: keyvalue
     name: slidea-redis
-    plan: starter
+    plan: standard
     ipAllowList:
       - source: 0.0.0.0/0
         description: allow all (dev)
@@ -26,17 +21,17 @@ services:
     numInstances: 1
     envVars:
       - key: MINIO_ROOT_USER
-        sync: false            # set in dashboard
+        sync: false
       - key: MINIO_ROOT_PASSWORD
         generateValue: true
       - key: PORT
         value: "10000"
-    disk:                      # one service only; this is fine
+    disk:
       name: uploads
       mountPath: /data
       sizeGB: 1
 
-  # Flask Web (Gunicorn via your Dockerfile)
+  # Flask Web
   - type: web
     name: slidea-web
     runtime: docker
@@ -44,9 +39,8 @@ services:
     dockerfilePath: ./Dockerfile
     autoDeploy: true
     numInstances: 1
-    healthCheckPath: /health    # make sure your app serves this 200 OK
+    healthCheckPath: /health
     envVars:
-      # Python/Flask
       - key: PYTHON_VERSION
         value: "3.11"
       - key: FLASK_APP
@@ -58,92 +52,20 @@ services:
       - key: SECRET_KEY
         generateValue: true
 
-      # Postgres
+      # Use existing Postgres by name (must exist in dashboard)
       - key: DATABASE_URL
         fromDatabase:
           name: slidea-db
           property: connectionString
 
-      # Redis (full URL for Celery)
+      # Redis URL from existing KeyValue
       - key: REDIS_URL
         fromService:
           name: slidea-redis
           type: keyvalue
           property: connectionString
 
-      # S3/MinIO (used by storage.py)
-      - key: S3_ENDPOINT
-        value: http://slidea-minio:10000
-      - key: S3_ACCESS_KEY
-        fromService:
-          name: slidea-minio
-          type: pserv
-          envVarKey: MINIO_ROOT_USER
-      - key: S3_SECRET_KEY
-        fromService:
-          name: slidea-minio
-          type: pserv
-          envVarKey: MINIO_ROOT_PASSWORD
-      - key: S3_BUCKET
-        value: slidea-uploads
-      - key: S3_USE_SSL
-        value: "false"
-
-      # Third-party secrets (set in dashboard)
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_PUBLISHABLE_KEY
-        sync: false
-      - key: STRIPE_ENDPOINT_SECRET
-        sync: false
-      - key: STRIPE_PRICE_ID_PRO
-        sync: false
-      - key: STRIPE_PRICE_ID_CREATOR
-        sync: false
-
-      # Optional app flags
-      - key: SERVICE_TYPE
-        value: web
-      - key: IS_WEB_SERVICE
-        value: "true"
-
-  # Celery Worker (same image as web)
-  - type: worker
-    name: slidea-worker
-    runtime: docker
-    plan: starter
-    dockerfilePath: ./Dockerfile
-    autoDeploy: true
-    numInstances: 1
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.11"
-      - key: FLASK_ENV
-        value: production
-
-      # Keep SECRET_KEY in sync with web
-      - key: SECRET_KEY
-        fromService:
-          name: slidea-web
-          type: web
-          envVarKey: SECRET_KEY
-
-      # Postgres
-      - key: DATABASE_URL
-        fromDatabase:
-          name: slidea-db
-          property: connectionString
-
-      # Redis (same URL as web)
-      - key: REDIS_URL
-        fromService:
-          name: slidea-redis
-          type: keyvalue
-          property: connectionString
-
-      # S3/MinIO (same as web)
+      # S3/MinIO
       - key: S3_ENDPOINT
         value: http://slidea-minio:10000
       - key: S3_ACCESS_KEY
@@ -162,6 +84,71 @@ services:
         value: "false"
 
       # Third-party secrets
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_ENDPOINT_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID_PRO
+        sync: false
+      - key: STRIPE_PRICE_ID_CREATOR
+        sync: false
+
+      - key: SERVICE_TYPE
+        value: web
+      - key: IS_WEB_SERVICE
+        value: "true"
+
+  # Celery Worker
+  - type: worker
+    name: slidea-worker
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    numInstances: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        fromService:
+          name: slidea-web
+          type: web
+          envVarKey: SECRET_KEY
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: slidea-db
+          property: connectionString
+
+      - key: REDIS_URL
+        fromService:
+          name: slidea-redis
+          type: keyvalue
+          property: connectionString
+
+      - key: S3_ENDPOINT
+        value: http://slidea-minio:10000
+      - key: S3_ACCESS_KEY
+        fromService:
+          name: slidea-minio
+          type: pserv
+          envVarKey: MINIO_ROOT_USER
+      - key: S3_SECRET_KEY
+        fromService:
+          name: slidea-minio
+          type: pserv
+          envVarKey: MINIO_ROOT_PASSWORD
+      - key: S3_BUCKET
+        value: slidea-uploads
+      - key: S3_USE_SSL
+        value: "false"
+
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
