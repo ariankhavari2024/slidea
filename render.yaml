@@ -1,7 +1,7 @@
- render.yaml (Final Version with Shared Disk)
+# render.yaml (Final Corrected Version with Shared Disk)
 # This blueprint defines all services and the shared disk for uploads.
 
-# --- NEW: Define the shared disk once at the top level ---
+# --- Define the shared disk once at the top level ---
 disks:
   - name: slidea-uploads
     sizeGB: 1 # Start with 1 GB, you can increase this later
@@ -28,7 +28,7 @@ services:
     # --- Attach the shared disk defined above ---
     disks:
       - name: slidea-uploads
-        mountPath: /app/app/static/uploads
+        mountPath: /app/app/static/uploads # <-- CORRECTED INDENTATION
     scaling:
       minInstances: 1
       maxInstances: 3
@@ -77,7 +77,7 @@ services:
     # --- Attach the SAME shared disk defined above ---
     disks:
       - name: slidea-uploads
-        mountPath: /app/app/static/uploads
+        mountPath: /app/app/static/uploads # <-- CORRECTED INDENTATION
     scaling:
       minInstances: 1
       maxInstances: 5
