@@ -37,7 +37,7 @@ def get_openai_client():
 
 def _get_text_model_default() -> str:
     # allow override via config; default to gpt-4o-mini for speed/cost
-    return current_app.config.get("OPENAI_TEXT_MODEL", "gpt-4o-mini")
+    return current_app.config.get("OPENAI_TEXT_MODEL", "gpt-5-nano")
 
 
 def _get_image_model_default() -> str:
@@ -594,41 +594,31 @@ def build_image_prompt(
 
 
 # -------- Image generation (gpt-image-1) --------
-def generate_slide_image(slide_topic, style="futuristic 3D isometric", presentation_type="business pitch"):
+def generate_slide_image(image_prompt, presentation_id=None, slide_number=None, style=None, presentation_type=None):
     """
-    Generate a presentation slide background image using gpt-image-1.
+    Generates a slide image using OpenAI's image API.
+    Accepts `image_prompt` as first arg to match tasks.py calls.
     """
-    from app.storage import save_image_from_base64
-    import base64
 
-    # Build the high-quality prompt
-    prompt = (
-        f"Ultra-detailed cinematic presentation slide background in {style}, "
-        f"themed for: \"{slide_topic}\". "
-        "No text. No watermarks. "
-        "Focus on clear composition, vibrant colors, and high contrast for readability of overlaid text. "
-        "Depth of field, professional lighting, and a clean modern design. "
-        "Aspect ratio 16:9. "
-        f"Perfect for a {presentation_type} presentation."
+    style = style or "cinematic 90s Apple aesthetic, ultra-modern presentation style, clean typography, vibrant but professional colors"
+    presentation_type = presentation_type or "stunning professional presentation slide"
+
+    # Merge into one prompt
+    final_prompt = (
+        f"{image_prompt}, {style}, {presentation_type}, "
+        f"high detail, ultra realistic, cinematic lighting, 16:9 aspect ratio"
     )
 
-    # Log the start
-    current_app.logger.info(f"[OAI] images.generate start (model=gpt-image-1, topic={slide_topic})")
+    from openai import OpenAI
+    client = OpenAI()
 
-    # Call OpenAI Images API — note: no response_format anymore
-    resp = client.images.generate(
+    result = client.images.generate(
         model="gpt-image-1",
-        prompt=prompt,
-        size="1920x1080",  # High-res 16:9 for presentations
-        n=1
+        prompt=final_prompt,
+        size="1920x1080"
     )
 
-    # Get base64 image data
-    image_b64 = resp.data[0].b64_json
-    image_bytes = base64.b64decode(image_b64)
+    image_url = result.data[0].url
+    return image_url, final_prompt
 
-    # Save to S3/local and return key
-    image_key = save_image_from_base64(image_bytes, f"{slide_topic.replace(' ', '_')}.png")
-
-    return image_key, prompt
 
