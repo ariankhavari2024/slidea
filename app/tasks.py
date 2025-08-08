@@ -22,116 +22,136 @@ TASK_RETRY_KWARGS = {'max_retries': 3, 'countdown': 60}
              autoretry_for=RETRYABLE_ERRORS,
              retry_kwargs=TASK_RETRY_KWARGS,
              rate_limit='4/m')
-def generate_single_slide_visual_task(self, slide_id, user_id, presentation_topic, presenter_name, total_slides, text_style_for_image, creativity_score, font_choice, presentation_style_prompt):
+def generate_single_slide_visual_task(
+    self,
+    slide_id: int,
+    user_id: int,
+    presentation_topic: str,
+    presenter_name: str,
+    total_slides: int,
+    text_style_for_image: str,
+    creativity_score: int,
+    font_choice: str,
+    presentation_style_prompt: str,
+):
     """
-    Celery task to generate image for a SINGLE slide.
-    FIXED: Creates its own app context to ensure reliability.
+    Generate the image for ONE slide and persist success markers.
+
+    Returns:
+        True  -> success (image uploaded + DB updated)
+        False -> hard failure (finalizer may mark presentation failed)
     """
-    # Create an app instance within the task for a reliable context
-    app = create_app()
-    with app.app_context():
-        app.logger.info(f"Task Started: Generating visual for Slide ID: {slide_id} by User ID: {user_id} (Attempt {self.request.retries + 1})")
-        app.logger.debug(f"Task Args: slide_id={slide_id}, user_id={user_id}, topic='{presentation_topic}', presenter='{presenter_name}', total={total_slides}, text_style='{text_style_for_image}', creativity={creativity_score}, font='{font_choice}'")
+    # We rely on Celery's ContextTask to give us an app context via current_app
+    app = current_app._get_current_object()
 
-        slide = db.session.get(Slide, slide_id)
-        if not slide:
-            app.logger.error(f"Task Error: Slide ID {slide_id} not found.")
-            return False # Non-retryable
+    app.logger.info(
+        f"[IMG] start slide={slide_id} user={user_id} try={self.request.retries + 1}"
+    )
+    app.logger.debug(
+        f"[IMG] args: topic='{presentation_topic}' presenter='{presenter_name}' "
+        f"total={total_slides} text_style='{text_style_for_image}' "
+        f"creativity={creativity_score} font='{font_choice}'"
+    )
 
-        if slide.image_url:
-            app.logger.info(f"Task Skip: Slide {slide.id} - image already exists.")
-            return True # Considered success
+    # --- Load DB objects
+    slide = db.session.get(Slide, slide_id)
+    if not slide:
+        app.logger.error(f"[IMG] abort: slide {slide_id} not found")
+        return False
 
-        presentation = db.session.get(Presentation, slide.presentation_id)
-        if not presentation:
-            app.logger.error(f"Task Error: Presentation ID {slide.presentation_id} for Slide {slide_id} not found.")
-            return False # Non-retryable
+    pres = db.session.get(Presentation, slide.presentation_id)
+    if not pres:
+        app.logger.error(f"[IMG] abort: presentation {slide.presentation_id} not found")
+        return False
 
-        # Check if presentation was cancelled or failed already
-        if presentation.status == PresentationStatus.GENERATION_FAILED:
-            app.logger.warning(f"Task Skip: Slide {slide.id} - Presentation {presentation.id} status is GENERATION_FAILED.")
-            return False # Don't proceed if already marked as failed
+    if pres.status == PresentationStatus.GENERATION_FAILED:
+        app.logger.warning(f"[IMG] skip: presentation {pres.id} already failed")
+        return False
 
-        try:
-            style_description_to_use = presentation_style_prompt
-            slide_content_parsed = slide.text_content
-            try:
-                # Attempt to parse JSON only if it looks like JSON
-                if slide.text_content and (slide.text_content.strip().startswith('[') or slide.text_content.strip().startswith('{')):
-                    slide_content_parsed = json.loads(slide.text_content)
-            except json.JSONDecodeError:
-                app.logger.warning(f"Could not parse slide content as JSON for slide {slide.id}, passing as string.")
-                pass
+    # Idempotency: if image already there, we succeed
+    if getattr(slide, "image_generated", False) and (slide.image_key or slide.image_url):
+        app.logger.info(f"[IMG] skip: slide {slide.id} already has image")
+        return True
 
-            image_gen_prompt_text = build_image_prompt(
-                slide_title=slide.title, slide_content=slide_content_parsed, style_description=style_description_to_use,
-                text_style=text_style_for_image, slide_number=slide.slide_number, total_slides=total_slides,
-                creativity_score=creativity_score, presentation_topic=presentation_topic, font_choice=font_choice,
-                presenter_name=presenter_name
-            )
+    # --- Build prompt
+    style_desc = presentation_style_prompt or ""
+    slide_content_parsed = slide.text_content
+    try:
+        if isinstance(slide.text_content, str) and slide.text_content.strip()[:1] in "[{":
+            import json
+            slide_content_parsed = json.loads(slide.text_content)
+    except Exception:
+        app.logger.warning(f"[IMG] non-json slide content for slide={slide.id}; using raw string")
 
-            relative_image_path, actual_prompt_used = generate_slide_image(
-                image_prompt=image_gen_prompt_text, presentation_id=presentation.id, slide_number=slide.slide_number
-            )
+    image_prompt = build_image_prompt(
+        slide_title=slide.title,
+        slide_content=slide_content_parsed,
+        style_description=style_desc,
+        text_style=text_style_for_image,
+        slide_number=slide.slide_number,
+        total_slides=total_slides,
+        creativity_score=creativity_score,
+        presentation_topic=presentation_topic,
+        font_choice=font_choice,
+        presenter_name=presenter_name,
+    )
 
-            if relative_image_path:
-                slide.image_url = relative_image_path
-                slide.image_gen_prompt = actual_prompt_used
-                slide.applied_style_info = style_description_to_use
-                db.session.add(slide)
-                db.session.commit()
-                app.logger.info(f"Task Success: Generated image for slide {slide.id}")
-                return True
-            else:
-                app.logger.warning(f"Task Failure: Image generation helper returned None for slide {slide.id}.")
-                return False
+    # --- Call OpenAI Images
+    try:
+        app.logger.info("[OAI] images.generate start")
+        image_url_or_key, revised_prompt = generate_slide_image(
+            image_prompt=image_prompt,
+            presentation_id=pres.id,
+            slide_number=slide.slide_number,
+        )
+        app.logger.info("[OAI] images.generate done")
+    except RateLimitError as e:
+        # exponential backoff
+        delay = min(60 * (2 ** self.request.retries), 600)
+        app.logger.warning(f"[OAI] rate limited; retry in {delay}s (attempt {self.request.retries+1}/{TASK_RETRY_KWARGS['max_retries']})")
+        raise self.retry(exc=e, countdown=delay, max_retries=TASK_RETRY_KWARGS["max_retries"])
+    except OpenAIError as e:
+        app.logger.error(f"[OAI] error: {e}", exc_info=True)
+        # retry a few times; if exhausted, return False
+        raise self.retry(exc=e, countdown=30, max_retries=TASK_RETRY_KWARGS["max_retries"])
+    except Exception as e:
+        app.logger.exception(f"[OAI] unexpected exception: {e}")
+        return False
 
-        # --- Specific Error Handling ---
-        except RateLimitError as e:
-            retry_delay = 60 * (2 ** self.request.retries)
-            app.logger.warning(f"Task Rate Limited: Slide ID {slide_id}. Retrying in {retry_delay}s... (Attempt {self.request.retries + 1}/{TASK_RETRY_KWARGS['max_retries']}) Error: {e}")
-            try:
-                self.retry(countdown=retry_delay, exc=e, max_retries=TASK_RETRY_KWARGS['max_retries'])
-            except MaxRetriesExceededError:
-                app.logger.error(f"Task Failed: Max retries exceeded for Slide ID {slide_id} after RateLimitError. Error: {e}")
-                db.session.rollback()
-                presentation_fail = db.session.get(Presentation, slide.presentation_id)
-                if presentation_fail and presentation_fail.status != PresentationStatus.GENERATION_FAILED:
-                    presentation_fail.status = PresentationStatus.GENERATION_FAILED
-                    db.session.add(presentation_fail)
-                    db.session.commit()
-                return False
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            app.logger.error(f"Task DB Error: Slide ID {slide_id}. Error: {e}", exc_info=True)
-            try:
-                self.retry(exc=e, countdown=30, max_retries=TASK_RETRY_KWARGS['max_retries'])
-            except MaxRetriesExceededError:
-                app.logger.error(f"Task Failed: Max retries exceeded for Slide ID {slide_id} after SQLAlchemyError. Error: {e}")
-                return False
-        except OpenAIError as e:
-            db.session.rollback()
-            app.logger.error(f"Task OpenAI Error: Slide ID {slide_id}. Error: {e}", exc_info=True)
-            try:
-                self.retry(exc=e, countdown=30, max_retries=TASK_RETRY_KWARGS['max_retries'])
-            except MaxRetriesExceededError:
-                app.logger.error(f"Task Failed: Max retries exceeded for Slide ID {slide_id} after OpenAIError. Error: {e}")
-                presentation_fail = db.session.get(Presentation, slide.presentation_id)
-                if presentation_fail and presentation_fail.status != PresentationStatus.GENERATION_FAILED:
-                    presentation_fail.status = PresentationStatus.GENERATION_FAILED
-                    db.session.add(presentation_fail)
-                    db.session.commit()
-                return False
-        except Exception as e:
-            db.session.rollback()
-            app.logger.error(f"Task Unexpected Failure: Slide ID {slide_id}. Error: {e}", exc_info=True)
-            presentation_fail = db.session.get(Presentation, slide.presentation_id)
-            if presentation_fail and presentation_fail.status != PresentationStatus.GENERATION_FAILED:
-                presentation_fail.status = PresentationStatus.GENERATION_FAILED
-                db.session.add(presentation_fail)
-                db.session.commit()
-            return False
+    if not image_url_or_key:
+        app.logger.error(f"[IMG] failed: no image returned for slide={slide.id}")
+        return False
 
+    # Our generate_slide_image returns a URL we can serve via /files/<key>
+    # If yours returns a raw key instead, build the URL here.
+    if image_url_or_key.startswith("/files/") or image_url_or_key.startswith("http"):
+        final_url = image_url_or_key
+        final_key = image_url_or_key.split("/files/", 1)[-1] if "/files/" in image_url_or_key else None
+    else:
+        # treat as key
+        final_key = image_url_or_key
+        final_url = url_for("main.serve_s3_file", key=final_key, _external=True)
+
+    # --- Persist success
+    try:
+        slide.image_key = final_key
+        slide.image_url = final_url
+        slide.image_gen_prompt = revised_prompt
+        slide.applied_style_info = style_desc
+        slide.image_generated = True
+        db.session.add(slide)
+        db.session.commit()
+        app.logger.info(f"[IMG] ok slide={slide.id} key={final_key} url={final_url}")
+        return True
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        app.logger.error(f"[IMG] DB error on slide={slide.id}: {e}", exc_info=True)
+        # small retry; DB hiccups happen
+        raise self.retry(exc=e, countdown=15, max_retries=TASK_RETRY_KWARGS["max_retries"])
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception(f"[IMG] unexpected DB exception slide={slide.id}: {e}")
+        return False
 
 # --- finalize_presentation_status_task (This task is already correct) ---
 @celery.task(name='app.tasks.finalize_presentation_status_task')
