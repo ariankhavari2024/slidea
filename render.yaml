@@ -1,55 +1,72 @@
-# render.yaml (Final Corrected Version with Shared Disk)
-# This blueprint defines all services and the shared disk for uploads.
+# render.yaml — Slidea (Web + Worker + Managed Postgres + Managed Redis + Shared Disk)
 
-# --- Define the shared disk once at the top level ---
+# --- Shared Disk ---
 disks:
   - name: slidea-uploads
-    sizeGB: 1 # Start with 1 GB, you can increase this later
+    sizeGB: 1
     mountPath: /app/app/static/uploads
 
-# Managed Database Definition
+# --- Managed Postgres ---
 databases:
   - name: slidea-db
     plan: standard
 
-# Managed Redis Definition
-redis:
-  - name: slidea-redis
+# --- Services ---
+services:
+  # Managed Redis
+  - type: redis
+    name: slidea-redis
     plan: standard
 
-# Application Services Definition
-services:
-  # Flask Web Service (using Gunicorn)
+  # Flask Web (Gunicorn via Dockerfile)
   - type: web
     name: slidea-web
     env: docker
     plan: standard
     dockerfilePath: ./Dockerfile
-    # --- Attach the shared disk defined above ---
+    autoDeploy: true
     disks:
       - name: slidea-uploads
-        mountPath: /app/app/static/uploads # <-- CORRECTED INDENTATION
+        mountPath: /app/app/static/uploads
     scaling:
       minInstances: 1
       maxInstances: 3
-      targetMemoryPercent: 70
       targetCPUPercent: 70
+      targetMemoryPercent: 70
     envVars:
+      # Lang/Flask
       - key: PYTHON_VERSION
         value: 3.11
       - key: FLASK_APP
         value: wsgi:app
       - key: FLASK_ENV
         value: production
-      - key: SECRET_KEY
-        generateValue: true
       - key: WEB_CONCURRENCY
         value: "4"
+
+      # App secrets
+      - key: SECRET_KEY
+        generateValue: true
+
+      # DB URL from managed Postgres
+      - key: DATABASE_URL
+        fromDatabase:
+          name: slidea-db
+          property: connectionString
+
+      # Redis URL from managed Redis
+      - key: REDIS_URL
+        fromService:
+          name: slidea-redis
+          property: connectionString
+
+      # Celery points to Redis
       - key: CELERY_BROKER_URL
         fromEnvVar: REDIS_URL
       - key: CELERY_RESULT_BACKEND
         fromEnvVar: REDIS_URL
-      # --- Secrets (Set in Render UI) ---
+
+      # Stripe / OpenAI (set in Render UI)
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
@@ -62,27 +79,28 @@ services:
         sync: false
       - key: STRIPE_PRICE_ID_CREATOR
         sync: false
-      # --- Service Type ---
+
+      # Service tags (optional, for your app logic)
       - key: SERVICE_TYPE
         value: web
       - key: IS_WEB_SERVICE
         value: "true"
 
-  # Celery Worker Service
+  # Celery Worker (same image)
   - type: worker
     name: slidea-worker
     env: docker
     plan: standard
     dockerfilePath: ./Dockerfile
-    # --- Attach the SAME shared disk defined above ---
+    autoDeploy: true
     disks:
       - name: slidea-uploads
-        mountPath: /app/app/static/uploads # <-- CORRECTED INDENTATION
+        mountPath: /app/app/static/uploads
     scaling:
       minInstances: 1
       maxInstances: 5
-      targetMemoryPercent: 70
       targetCPUPercent: 70
+      targetMemoryPercent: 70
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
@@ -90,15 +108,32 @@ services:
         value: wsgi:app
       - key: FLASK_ENV
         value: production
+
+      # Reuse the web's SECRET_KEY
       - key: SECRET_KEY
         fromService:
           name: slidea-web
           envVarKey: SECRET_KEY
+
+      # DB URL from managed Postgres
+      - key: DATABASE_URL
+        fromDatabase:
+          name: slidea-db
+          property: connectionString
+
+      # Redis URL from managed Redis
+      - key: REDIS_URL
+        fromService:
+          name: slidea-redis
+          property: connectionString
+
+      # Celery to Redis
       - key: CELERY_BROKER_URL
         fromEnvVar: REDIS_URL
       - key: CELERY_RESULT_BACKEND
         fromEnvVar: REDIS_URL
-      # --- Secrets (Set in Render UI) ---
+
+      # Secrets (set in UI)
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
@@ -107,7 +142,7 @@ services:
         sync: false
       - key: STRIPE_PRICE_ID_CREATOR
         sync: false
-      # --- Service Type ---
+
       - key: SERVICE_TYPE
         value: worker
       - key: IS_WEB_SERVICE
