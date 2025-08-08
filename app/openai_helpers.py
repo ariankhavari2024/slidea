@@ -37,7 +37,7 @@ def get_openai_client():
 
 def _get_text_model_default() -> str:
     # allow override via config; default to gpt-4o-mini for speed/cost
-    return current_app.config.get("OPENAI_TEXT_MODEL", "gpt-4-mini")
+    return current_app.config.get("OPENAI_TEXT_MODEL", "gpt-4o-mini")
 
 
 def _get_image_model_default() -> str:
