@@ -38,6 +38,9 @@ except ImportError:
     PPTX_INSTALLED = False
 
 main = Blueprint('main', __name__)
+@main.get("/health")
+def health():
+    return "ok", 200
 
 # --- NEW ROUTE for serving files from MinIO/S3 ---
 @main.route("/files/<path:key>")
