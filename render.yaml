@@ -1,15 +1,21 @@
-# render.yaml (Upgraded for Production)
-# Blueprint for deploying the SlideaAI Flask application on Render
+# render.yaml (Final Version with Shared Disk)
+# This blueprint defines all services and the shared disk for uploads.
+
+# --- NEW: Define the shared disk once at the top level ---
+disks:
+  - name: slidea-uploads
+    sizeGB: 1 # Start with 1 GB, you can increase this later
+    mountPath: /app/app/static/uploads
 
 # Managed Database Definition
 databases:
   - name: slidea-db
-    plan: standard # UPGRADED: From starter to standard for persistence and performance.
+    plan: standard
 
 # Managed Redis Definition
 redis:
   - name: slidea-redis
-    plan: standard # UPGRADED: From free to a paid plan for more memory.
+    plan: standard
 
 # Application Services Definition
 services:
@@ -17,14 +23,17 @@ services:
   - type: web
     name: slidea-web
     env: docker
-    plan: standard # UPGRADED: From starter to handle more user traffic.
+    plan: standard
     dockerfilePath: ./Dockerfile
-    # Add auto-scaling rules here for production
+    # --- Attach the shared disk defined above ---
+    disks:
+      - name: slidea-uploads
+        mountPath: /app/app/static/uploads
     scaling:
       minInstances: 1
-      maxInstances: 3 # Example: scale up to 3 instances under load
-      targetMemoryPercent: 70 # Example: scale up if memory usage is > 70%
-      targetCPUPercent: 70 # Example: scale up if CPU usage is > 70%
+      maxInstances: 3
+      targetMemoryPercent: 70
+      targetCPUPercent: 70
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
@@ -35,8 +44,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: WEB_CONCURRENCY
-        value: "4" # Set based on your plan's CPU count (e.g., Standard has 2 vCPU, so (2*2)+1=5 is a good start)
-      # --- Database & Redis Connection ---
+        value: "4"
       - key: CELERY_BROKER_URL
         fromEnvVar: REDIS_URL
       - key: CELERY_RESULT_BACKEND
@@ -64,12 +72,15 @@ services:
   - type: worker
     name: slidea-worker
     env: docker
-    plan: standard # UPGRADED: From starter to process AI tasks faster.
+    plan: standard
     dockerfilePath: ./Dockerfile
-    # Add auto-scaling rules here for production
+    # --- Attach the SAME shared disk defined above ---
+    disks:
+      - name: slidea-uploads
+        mountPath: /app/app/static/uploads
     scaling:
       minInstances: 1
-      maxInstances: 5 # Example: scale up to 5 workers if queue is long
+      maxInstances: 5
       targetMemoryPercent: 70
       targetCPUPercent: 70
     envVars:
@@ -83,7 +94,6 @@ services:
         fromService:
           name: slidea-web
           envVarKey: SECRET_KEY
-      # --- Database & Redis Connection ---
       - key: CELERY_BROKER_URL
         fromEnvVar: REDIS_URL
       - key: CELERY_RESULT_BACKEND
@@ -101,4 +111,4 @@ services:
       - key: SERVICE_TYPE
         value: worker
       - key: IS_WEB_SERVICE
-        value: "false"
+        value: "false
