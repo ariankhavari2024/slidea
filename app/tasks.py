@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from . import celery, db, create_app # Import create_app
 from .models import Presentation, Slide, PresentationStatus, User # Import User
 from .openai_helpers import build_image_prompt, generate_slide_image, get_style_description
-from flask import url_for
+from flask import url_for, current_app
 from openai import OpenAIError, RateLimitError
 from requests.exceptions import RequestException
 from sqlalchemy.exc import SQLAlchemyError
