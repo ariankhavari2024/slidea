@@ -594,58 +594,41 @@ def build_image_prompt(
 
 
 # -------- Image generation (gpt-image-1) --------
-def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: int) -> tuple[str | None, str]:
+def generate_slide_image(slide_topic, style="futuristic 3D isometric", presentation_type="business pitch"):
     """
-    Generate a slide image via OpenAI Images API (gpt-image-1) and upload to MinIO/S3.
-    Returns:
-      (key, revised_prompt) on success, or (None, original_prompt) on failure.
-    NOTE: We return the S3 object *key* (not a Flask URL). The caller should build "/files/<key>".
+    Generate a presentation slide background image using gpt-image-1.
     """
-    client = get_openai_client()
-    image_model = _get_image_model_default()  # defaults to "gpt-image-1"
-    revised_prompt = "[N/A]"
+    from app.storage import save_image_from_base64
+    import base64
 
-    log_prompt_to_file("Image Generation Request", {
-        "Model": image_model,
-        "Prompt Sent": image_prompt
-    })
+    # Build the high-quality prompt
+    prompt = (
+        f"Ultra-detailed cinematic presentation slide background in {style}, "
+        f"themed for: \"{slide_topic}\". "
+        "No text. No watermarks. "
+        "Focus on clear composition, vibrant colors, and high contrast for readability of overlaid text. "
+        "Depth of field, professional lighting, and a clean modern design. "
+        "Aspect ratio 16:9. "
+        f"Perfect for a {presentation_type} presentation."
+    )
 
-    try:
-        current_app.logger.info(f"[OAI] images.generate start (model={image_model})")
-        resp = client.images.generate(
-            model=image_model,
-            prompt=image_prompt,
-            n=1,
-            size=current_app.config.get("OPENAI_IMAGE_SIZE", "1792x1024"),
-            response_format="b64_json",
-        )
+    # Log the start
+    current_app.logger.info(f"[OAI] images.generate start (model=gpt-image-1, topic={slide_topic})")
 
-        if not resp or not getattr(resp, "data", None):
-            raise ValueError("OpenAI Images API returned no data")
+    # Call OpenAI Images API — note: no response_format anymore
+    resp = client.images.generate(
+        model="gpt-image-1",
+        prompt=prompt,
+        size="1920x1080",  # High-res 16:9 for presentations
+        n=1
+    )
 
-        data = resp.data[0]
-        img_b64 = getattr(data, "b64_json", None)
-        revised_prompt = getattr(data, "revised_prompt", "") or "[No revised prompt provided]"
+    # Get base64 image data
+    image_b64 = resp.data[0].b64_json
+    image_bytes = base64.b64decode(image_b64)
 
-        if not img_b64:
-            raise ValueError("OpenAI response missing b64_json image data")
+    # Save to S3/local and return key
+    image_key = save_image_from_base64(image_bytes, f"{slide_topic.replace(' ', '_')}.png")
 
-        img_bytes = base64.b64decode(img_b64)
-        current_app.logger.info("[OAI] images.generate done")
+    return image_key, prompt
 
-        # Unique object key
-        key = f"{presentation_id}/slide_{slide_number}_{uuid.uuid4().hex[:8]}.png"
-
-        # Upload to storage
-        put_bytes(key, img_bytes, content_type="image/png")
-        current_app.logger.info(f"[S3] PUT ok key={key} bytes={len(img_bytes)}")
-
-        return key, revised_prompt
-
-    except (RateLimitError, APIConnectionError, APIStatusError, OpenAIError) as e:
-        # Let Celery's autoretry handle backoff
-        current_app.logger.error(f"[OAI] error: {e}")
-        raise
-    except Exception as e:
-        current_app.logger.error(f"[IMG] unexpected error: {e}", exc_info=True)
-        return None, image_prompt
