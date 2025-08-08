@@ -1,10 +1,7 @@
-# Slidea — Render blueprint (Hobby-friendly, uses existing DB, keeps Redis=standard)
-
-# NOTE: We are NOT creating the database here to avoid legacy plan errors.
-# Make sure you already have a DB named "slidea-db" in the dashboard.
+# Slidea — Web + Worker + KeyValue (Redis) + MinIO (S3) — uses EXISTING Postgres DB named "slidea-db"
 
 services:
-  # Redis-compatible store (existing instance is Standard; keep it)
+  # Redis-compatible store (Celery broker/result)
   - type: keyvalue
     name: slidea-redis
     plan: standard
@@ -12,7 +9,7 @@ services:
       - source: 0.0.0.0/0
         description: allow all (dev)
 
-  # MinIO object storage (S3 API) for shared uploads
+  # MinIO object storage (private S3 API)
   - type: pserv
     name: slidea-minio
     runtime: docker
@@ -21,9 +18,9 @@ services:
     numInstances: 1
     envVars:
       - key: MINIO_ROOT_USER
-        sync: false
+        value: slideaadmin           # <-- set a username you like
       - key: MINIO_ROOT_PASSWORD
-        generateValue: true
+        generateValue: true          # <-- auto-generated password
       - key: PORT
         value: "10000"
     disk:
@@ -41,6 +38,7 @@ services:
     numInstances: 1
     healthCheckPath: /health
     envVars:
+      # Python/Flask
       - key: PYTHON_VERSION
         value: "3.11"
       - key: FLASK_APP
@@ -52,20 +50,20 @@ services:
       - key: SECRET_KEY
         generateValue: true
 
-      # Use existing Postgres by name (must exist in dashboard)
+      # EXISTING Postgres (create in dashboard; just reference here)
       - key: DATABASE_URL
         fromDatabase:
           name: slidea-db
           property: connectionString
 
-      # Redis URL from existing KeyValue
+      # Redis URL
       - key: REDIS_URL
         fromService:
           name: slidea-redis
           type: keyvalue
           property: connectionString
 
-      # S3/MinIO
+      # S3/MinIO creds for storage.py
       - key: S3_ENDPOINT
         value: http://slidea-minio:10000
       - key: S3_ACCESS_KEY
@@ -83,7 +81,7 @@ services:
       - key: S3_USE_SSL
         value: "false"
 
-      # Third-party secrets
+      # Third‑party secrets (set in dashboard)
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
@@ -102,7 +100,7 @@ services:
       - key: IS_WEB_SERVICE
         value: "true"
 
-  # Celery Worker
+  # Celery Worker (same image — override start command!)
   - type: worker
     name: slidea-worker
     runtime: docker
@@ -110,11 +108,16 @@ services:
     dockerfilePath: ./Dockerfile
     autoDeploy: true
     numInstances: 1
+    # ⬇️ Change "app.celery_app" to your actual Celery instance path
+    startCommand: >
+      celery -A app.celery_app worker --loglevel=INFO --concurrency=2
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
       - key: FLASK_ENV
         value: production
+
+      # share SECRET_KEY with web
       - key: SECRET_KEY
         fromService:
           name: slidea-web
@@ -132,6 +135,7 @@ services:
           type: keyvalue
           property: connectionString
 
+      # S3/MinIO
       - key: S3_ENDPOINT
         value: http://slidea-minio:10000
       - key: S3_ACCESS_KEY
