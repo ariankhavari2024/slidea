@@ -530,4 +530,4 @@ def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: 
         raise  # Let Celery handle the retry
     except Exception as e:
         current_app.logger.error(f"An unexpected error occurred in generate_slide_image: {e}", exc_info=True)
-        return None, image_pro
+        return None, image_prompt
