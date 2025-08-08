@@ -1,18 +1,24 @@
-# render.yaml — Slidea (Web + Worker + Postgres + KeyValue + MinIO w/ disk)
+# render.yaml — Slidea (Web + Worker + Postgres + KeyValue + MinIO)
 
-# --- Managed Postgres ---
 databases:
   - name: slidea-db
     plan: standard
+    # Optional: open while you iterate; tighten later
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: allow all (dev)
 
-# --- Services ---
 services:
-  # Key Value (Redis-compatible)
+  # Redis-compatible Key Value
   - type: keyvalue
     name: slidea-redis
     plan: standard
+    # REQUIRED by spec
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: allow all (dev)
 
-  # MinIO object storage (shared uploads via S3 API)
+  # MinIO object storage for shared uploads
   - type: pserv
     name: slidea-minio
     runtime: docker
@@ -20,12 +26,12 @@ services:
     repo: https://github.com/render-examples/minio.git
     envVars:
       - key: MINIO_ROOT_USER
-        sync: false          # set in dashboard
+        sync: false
       - key: MINIO_ROOT_PASSWORD
         generateValue: true
       - key: PORT
         value: "10000"
-    disk:                    # <- singular, attached to THIS service only
+    disk:
       name: uploads
       mountPath: /data
       sizeGB: 1
@@ -43,7 +49,6 @@ services:
       targetCPUPercent: 70
       targetMemoryPercent: 70
     envVars:
-      # Lang/Flask
       - key: PYTHON_VERSION
         value: "3.11"
       - key: FLASK_APP
@@ -55,13 +60,13 @@ services:
       - key: SECRET_KEY
         generateValue: true
 
-      # Postgres URL
+      # Postgres
       - key: DATABASE_URL
         fromDatabase:
           name: slidea-db
           property: connectionString
 
-      # Redis connection pieces (build URL in code)
+      # Redis pieces (assemble URL in code)
       - key: REDIS_HOST
         fromService:
           name: slidea-redis
@@ -73,7 +78,7 @@ services:
           type: keyvalue
           property: port
 
-      # S3-style uploads (MinIO)
+      # S3/MinIO
       - key: S3_ENDPOINT
         value: http://slidea-minio:10000
       - key: S3_ACCESS_KEY
@@ -105,7 +110,6 @@ services:
       - key: STRIPE_PRICE_ID_CREATOR
         sync: false
 
-      # Optional app flags
       - key: SERVICE_TYPE
         value: web
       - key: IS_WEB_SERVICE
@@ -134,13 +138,11 @@ services:
           type: web
           envVarKey: SECRET_KEY
 
-      # Postgres
       - key: DATABASE_URL
         fromDatabase:
           name: slidea-db
           property: connectionString
 
-      # Redis pieces (build URL in code)
       - key: REDIS_HOST
         fromService:
           name: slidea-redis
@@ -152,7 +154,6 @@ services:
           type: keyvalue
           property: port
 
-      # S3/MinIO
       - key: S3_ENDPOINT
         value: http://slidea-minio:10000
       - key: S3_ACCESS_KEY
@@ -170,7 +171,6 @@ services:
       - key: S3_USE_SSL
         value: "false"
 
-      # Third-party secrets (set in UI)
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
