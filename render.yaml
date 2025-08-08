@@ -25,11 +25,30 @@ services:
   # Worker Service
   - type: worker
     name: slidea-worker
-    env: python
+    runtime: docker
     plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.celery worker --loglevel=info
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    numInstances: 1
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        fromService:
+          name: slidea-web
+          type: web
+          envVarKey: SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: slidea-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: slidea-redis
+          type: keyvalue
+          property: connectionString
       - key: S3_ENDPOINT
         value: http://slidea-minio-v2:10000
       - key: S3_ACCESS_KEY
@@ -42,6 +61,17 @@ services:
           name: slidea-minio-v2
           type: pserv
           envVarKey: MINIO_ROOT_PASSWORD
+      - key: S3_BUCKET
+        value: slidea-uploads
+      - key: S3_USE_SSL
+        value: "false"
+
+    # tell entrypoint to run Celery
+    - key: SERVICE_TYPE
+      value: worker
+    - key: IS_WEB_SERVICE
+      value: "false"
+
 
   # MinIO Private Service
   - type: pserv
