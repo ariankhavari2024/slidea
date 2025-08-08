@@ -1,4 +1,4 @@
-# render.yaml (Final Version with Shared Disk)
+ render.yaml (Final Version with Shared Disk)
 # This blueprint defines all services and the shared disk for uploads.
 
 # --- NEW: Define the shared disk once at the top level ---
@@ -111,4 +111,4 @@ services:
       - key: SERVICE_TYPE
         value: worker
       - key: IS_WEB_SERVICE
-        value: "false
+        value: "false"
