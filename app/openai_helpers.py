@@ -594,31 +594,67 @@ def build_image_prompt(
 
 
 # -------- Image generation (gpt-image-1) --------
-def generate_slide_image(image_prompt, presentation_id=None, slide_number=None, style=None, presentation_type=None):
+def generate_slide_image(image_prompt: str, presentation_id: int | None = None, slide_number: int | None = None,
+                         style: str | None = None, presentation_type: str | None = None) -> tuple[str | None, str]:
     """
-    Generates a slide image using OpenAI's image API.
-    Accepts `image_prompt` as first arg to match tasks.py calls.
+    Generates a slide image using OpenAI's Images API and uploads to storage.
+    Returns (key, revised_prompt) on success, or (None, original_prompt) on failure.
     """
-
+    client = get_openai_client()
+    image_model = _get_image_model_default()  # "gpt-image-1"
     style = style or "cinematic 90s Apple aesthetic, ultra-modern presentation style, clean typography, vibrant but professional colors"
     presentation_type = presentation_type or "stunning professional presentation slide"
 
-    # Merge into one prompt
-    final_prompt = (
-        f"{image_prompt}, {style}, {presentation_type}, "
-        f"high detail, ultra realistic, cinematic lighting, 16:9 aspect ratio"
-    )
+    # Keep prompt consistent with your build_image_prompt output (3:2)
+    size = current_app.config.get("OPENAI_IMAGE_SIZE", "1536x1024")
 
-    from openai import OpenAI
-    client = OpenAI()
+    final_prompt = f"{image_prompt}, {style}, {presentation_type}, high detail, cinematic lighting"
 
-    result = client.images.generate(
-        model="gpt-image-1",
-        prompt=final_prompt,
-        size="1920x1080"
-    )
+    log_prompt_to_file("Image Generation Request", {
+        "Model": image_model,
+        "Size": size,
+        "Prompt Sent": final_prompt
+    })
 
-    image_url = result.data[0].url
-    return image_url, final_prompt
+    try:
+        current_app.logger.info(f"[OAI] images.generate start (model={image_model}, size={size})")
+        resp = client.images.generate(
+            model=image_model,
+            prompt=final_prompt,
+            size=size,
+            # quality="hd",  # optional, comment out if you don't want the cost bump
+            n=1
+        )
 
+        if not resp or not getattr(resp, "data", None):
+            raise ValueError("OpenAI Images API returned no data")
+
+        data0 = resp.data[0]
+        img_b64 = getattr(data0, "b64_json", None)
+        revised_prompt = getattr(data0, "revised_prompt", "") or "[No revised prompt provided]"
+
+        if not img_b64:
+            raise ValueError("OpenAI response missing b64_json image data")
+
+        img_bytes = base64.b64decode(img_b64)
+
+        # Build a deterministic key if IDs are present
+        uid = uuid.uuid4().hex[:8]
+        if presentation_id is not None and slide_number is not None:
+            key = f"{presentation_id}/slide_{slide_number}_{uid}.png"
+        else:
+            key = f"misc/{uid}.png"
+
+        put_bytes(key, img_bytes, content_type="image/png")
+        current_app.logger.info(f"[S3] PUT ok key={key} bytes={len(img_bytes)}")
+
+        return key, revised_prompt
+
+    except (RateLimitError, APIConnectionError, APIStatusError, OpenAIError) as e:
+        current_app.logger.error("OpenAI API error during image generation", exc_info=True)
+        # Re-raise so Celery retry/backoff can handle it if you use autoretry
+        raise
+    except Exception as e:
+        current_app.logger.error(f"[IMG] unexpected error: {e}", exc_info=True)
+        return None, image_prompt
 
