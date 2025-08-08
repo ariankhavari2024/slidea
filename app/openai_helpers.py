@@ -15,7 +15,11 @@ except ImportError:
     raise ImportError("OpenAI library not found. Please install it using: pip install openai>=1.0.0")
 from flask import current_app, url_for
 
-# --- get_openai_client (No changes needed) ---
+# --- NEW IMPORT ---
+# Import the helper functions from your new storage service
+from .storage import put_bytes
+
+# --- get_openai_client (Unchanged) ---
 def get_openai_client():
     """Initializes and returns the OpenAI client."""
     api_key = current_app.config.get('OPENAI_API_KEY')
@@ -29,7 +33,7 @@ def get_openai_client():
         current_app.logger.error(f"Failed to initialize OpenAI client: {e}", exc_info=True)
         raise ValueError(f"Failed to initialize OpenAI client: {e}")
 
-# --- log_prompt_to_file (No changes needed) ---
+# --- log_prompt_to_file (Unchanged) ---
 def log_prompt_to_file(log_type, prompt_data):
     """Appends prompt data to the configured log file."""
     log_file_path = current_app.config.get('PROMPT_LOG_FILE')
@@ -48,7 +52,7 @@ def log_prompt_to_file(log_type, prompt_data):
         current_app.logger.error(f"Error during prompt logging: {e}", exc_info=True)
 
 
-# --- generate_text_content (No changes needed) ---
+# --- generate_text_content (Restored from your original code) ---
 def generate_text_content(topic: str, text_style: str = 'bullet', desired_slide_count: int = 10, presenter_name: str | None = None) -> list[dict]:
     """
     Generates structured slide text content using OpenAI API.
@@ -238,7 +242,7 @@ Return the content in this **exact JSON format**: a single JSON list where each 
         raise
 
 
-# --- generate_missing_slide_content (No changes needed) ---
+# --- generate_missing_slide_content (Restored from your original code) ---
 def generate_missing_slide_content(slide_title: str, text_style: str = 'bullet', presentation_topic: str | None = None) -> str | list:
     """
     Generates content for a single slide when manually entered content is blank.
@@ -310,7 +314,7 @@ Example Format ({text_style}): {content_format_example}
         return "[AI content generation error]" if text_style == 'paragraph' else ["[AI content generation error]"]
 
 
-# --- parse_manual_content (No changes) ---
+# --- parse_manual_content (Restored from your original code) ---
 def parse_manual_content(script_text: str) -> list[dict]:
     """Parses user-provided script text into slides based on 'Title:' or 'Slide X:' markers."""
     slides_data = []
@@ -353,7 +357,7 @@ def parse_manual_content(script_text: str) -> list[dict]:
 
 # --- VISUAL GENERATION HELPERS ---
 
-# --- get_style_description (No changes needed) ---
+# --- get_style_description (Restored from your original code) ---
 def get_style_description(style_key_or_prompt: str) -> str:
     """Returns a detailed description for predefined styles, or the prompt itself if custom."""
     style_map = {
@@ -369,7 +373,7 @@ def get_style_description(style_key_or_prompt: str) -> str:
     return style_map.get(style_key_or_prompt, style_key_or_prompt)
 
 
-# --- build_image_prompt (No changes needed) ---
+# --- build_image_prompt (Restored from your original code) ---
 def build_image_prompt(slide_title: str,
                        slide_content: str | list | None,
                        style_description: str,
@@ -477,104 +481,53 @@ def build_image_prompt(slide_title: str,
     return final_prompt
 
 
-# --- generate_slide_image (FIXED) ---
+# --- generate_slide_image (FINAL, CORRECTED VERSION) ---
 def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: int) -> tuple[str | None, str]:
     """
-    Generates and saves a slide image using DALL-E 3,
-    handling the base64 JSON response.
+    Generates an image using DALL-E 3 and uploads it to MinIO via the storage service.
+    Returns a stable, proxied URL for the image on success.
     """
     client = get_openai_client()
-    saved_path_relative = None
-    save_path_full = "[Path not determined]"
-    actual_prompt_used = image_prompt
-    revised_prompt = "[N/A for this model]"
+    revised_prompt = "[N/A]"
 
     log_prompt_to_file("Image Generation Request (dall-e-3)", {"Prompt Sent": image_prompt})
 
     try:
-        # FIX 1: Correct model name
-        model_to_use = "dall-e-3"
-        current_app.logger.info(f"Generating image ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number} via images endpoint...")
+        # 1. Generate the image with OpenAI
         response = client.images.generate(
-            model=model_to_use,
+            model="dall-e-3",
             prompt=image_prompt,
             n=1,
-            # FIX 2: Use a supported landscape size (1792x1024 is closest to 16:9)
             size="1792x1024",
-            # FIX 3: Use the correct quality parameter
             quality="hd",
-            # Ensure response is base64 encoded
-            response_format="b64_json"
+            response_format="b64_json",
         )
+        data = response.data[0]
+        img_b64 = getattr(data, "b64_json", None)
+        revised_prompt = getattr(data, "revised_prompt", "") or "[No revised prompt provided]"
+        
+        if not img_b64:
+            raise ValueError("OpenAI API response was missing the b64_json image data.")
 
-        image_base64 = None
-        if response.data and response.data[0].b64_json:
-            image_base64 = response.data[0].b64_json
-            # Get the revised prompt for logging/debugging if available
-            revised_prompt = response.data[0].revised_prompt or "[No revised prompt provided]"
-            current_app.logger.info(f"Base64 image data received for Pres:{presentation_id} Slide:{slide_number}.")
-            log_prompt_to_file("Image Generation Response Info (dall-e-3)", f"Pres ID: {presentation_id}, Slide: {slide_number}\nRevised Prompt: {revised_prompt}")
-        else:
-            current_app.logger.error(f"OpenAI response missing image data (b64_json) for Pres:{presentation_id} Slide:{slide_number}. Response: {response}")
-            raise ValueError("API response did not contain expected b64_json image data.")
+        img_bytes = base64.b64decode(img_b64)
 
-        if image_base64:
-            try:
-                image_bytes = base64.b64decode(image_base64)
-            except (TypeError, base64.binascii.Error) as decode_error:
-                current_app.logger.error(f"Base64 Decode Error for Pres:{presentation_id} Slide:{slide_number}: {decode_error}")
-                raise ValueError("Failed to decode base64 image data.") from decode_error
+        # 2. Define a unique key (filename) for the image in the bucket
+        unique_id = uuid.uuid4().hex[:8]
+        key = f"{presentation_id}/slide_{slide_number}_{unique_id}.png"
 
-            if not os.path.exists(current_app.static_folder):
-                os.makedirs(current_app.static_folder)
-            
-            base_upload_folder = os.path.join(current_app.static_folder, 'uploads')
-            presentation_folder = os.path.join(base_upload_folder, str(presentation_id))
-            os.makedirs(presentation_folder, exist_ok=True)
+        # 3. Upload the image bytes to MinIO using the storage helper
+        put_bytes(key, img_bytes, content_type="image/png")
 
-            unique_id = uuid.uuid4().hex[:8]
-            filename = f"slide_{slide_number}_{unique_id}.png"
-            save_path_full = os.path.join(presentation_folder, filename)
-            current_app.logger.info(f"Attempting to save decoded image bytes to: {save_path_full}")
+        # 4. Construct and return a stable, internal URL for our Flask app to serve
+        # This URL will be handled by the new route in `routes.py`
+        stable_url = url_for('main.serve_s3_file', key=key, _external=False) # Use relative URL
 
-            try:
-                with open(save_path_full, 'wb') as f:
-                    f.write(image_bytes)
-                bytes_written = len(image_bytes)
-                if os.path.exists(save_path_full) and bytes_written > 0:
-                    saved_path_relative = os.path.join('uploads', str(presentation_id), filename).replace(os.path.sep, '/')
-                    current_app.logger.info(f"Image successfully saved ({bytes_written} bytes) for Pres:{presentation_id} Slide:{slide_number} as: {saved_path_relative}")
-                else:
-                    current_app.logger.error(f"Image file NOT found or empty after write attempt at {save_path_full}")
-                    saved_path_relative = None
-            except IOError as e:
-                current_app.logger.error(f"Error saving image file for Pres:{presentation_id} Slide:{slide_number} to path {save_path_full}: {e}")
-                saved_path_relative = None
-        else:
-            current_app.logger.error(f"Image base64 data was unexpectedly None for Pres:{presentation_id} Slide:{slide_number}")
-            saved_path_relative = None
+        current_app.logger.info(f"Uploaded slide image to S3 key='{key}'. App will serve it from '{stable_url}'")
+        return stable_url, revised_prompt
 
-    except RateLimitError as e:
-        current_app.logger.error(f"OpenAI Rate Limit Error ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: {e}")
-        raise
-    except APIConnectionError as e:
-        current_app.logger.error(f"OpenAI Connection Error ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: {e}")
-        raise
-    except APIStatusError as e:
-        current_app.logger.error(f"OpenAI API Status Error ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: Status={e.status_code}, Response={e.response}")
-        if e.status_code == 404: current_app.logger.error(f"Model '{model_to_use}' not found or access denied.")
-        elif e.status_code == 400: current_app.logger.error(f"Bad Request (400) calling {model_to_use}. Check API parameters or prompt content. Details: {e.response}")
-        raise
-    except OpenAIError as e:
-        current_app.logger.error(f"OpenAI API Error ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: {e}")
-        raise
-    except (IOError, ValueError, TypeError, base64.binascii.Error) as e:
-        current_app.logger.error(f"File/Decode Error during image processing for slide {slide_number}: {e}", exc_info=True)
-        saved_path_relative = None
+    except (RateLimitError, APIConnectionError, APIStatusError, OpenAIError) as e:
+        current_app.logger.error(f"OpenAI API error during image generation: {e}")
+        raise  # Let Celery handle the retry
     except Exception as e:
-        current_app.logger.error(f"Unexpected error in generate_slide_image ({model_to_use}) for Pres:{presentation_id} Slide:{slide_number}: {e}", exc_info=True)
-        saved_path_relative = None
-
-    # Return the path and the *actual* prompt used by the API
-    return saved_path_relative, revised_prompt
-
+        current_app.logger.error(f"An unexpected error occurred in generate_slide_image: {e}", exc_info=True)
+        return None, image_pro
