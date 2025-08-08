@@ -484,8 +484,10 @@ def build_image_prompt(slide_title: str,
 # --- generate_slide_image (FINAL, CORRECTED VERSION) ---
 def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: int) -> tuple[str | None, str]:
     """
-    Generates an image using DALL-E 3 and uploads it to MinIO via the storage service.
-    Returns a stable, proxied URL for the image on success.
+    Generate a slide image via OpenAI (DALL·E 3) and upload to MinIO/S3.
+    Returns:
+      (key, revised_prompt) on success, or (None, original_prompt) on failure.
+    NOTE: We return the S3 object *key* (not a Flask URL). The caller should build "/files/<key>".
     """
     client = get_openai_client()
     revised_prompt = "[N/A]"
@@ -493,8 +495,9 @@ def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: 
     log_prompt_to_file("Image Generation Request (dall-e-3)", {"Prompt Sent": image_prompt})
 
     try:
-        # 1. Generate the image with OpenAI
-        response = client.images.generate(
+        # 1) Generate the image
+        current_app.logger.info("[OAI] images.generate start")
+        resp = client.images.generate(
             model="dall-e-3",
             prompt=image_prompt,
             n=1,
@@ -502,32 +505,30 @@ def generate_slide_image(image_prompt: str, presentation_id: int, slide_number: 
             quality="hd",
             response_format="b64_json",
         )
-        data = response.data[0]
+        data = resp.data[0]
         img_b64 = getattr(data, "b64_json", None)
         revised_prompt = getattr(data, "revised_prompt", "") or "[No revised prompt provided]"
-        
         if not img_b64:
-            raise ValueError("OpenAI API response was missing the b64_json image data.")
+            raise ValueError("OpenAI response missing b64_json image data")
 
         img_bytes = base64.b64decode(img_b64)
+        current_app.logger.info("[OAI] images.generate done")
 
-        # 2. Define a unique key (filename) for the image in the bucket
+        # 2) Make a unique object key
         unique_id = uuid.uuid4().hex[:8]
         key = f"{presentation_id}/slide_{slide_number}_{unique_id}.png"
 
-        # 3. Upload the image bytes to MinIO using the storage helper
+        # 3) Upload to MinIO/S3
         put_bytes(key, img_bytes, content_type="image/png")
+        current_app.logger.info(f"[S3] PUT ok key={key} bytes={len(img_bytes)}")
 
-        # 4. Construct and return a stable, internal URL for our Flask app to serve
-        # This URL will be handled by the new route in `routes.py`
-        stable_url = url_for('main.serve_s3_file', key=key, _external=False) # Use relative URL
-
-        current_app.logger.info(f"Uploaded slide image to S3 key='{key}'. App will serve it from '{stable_url}'")
-        return stable_url, revised_prompt
+        # 4) Return the key (caller will build '/files/<key>')
+        return key, revised_prompt
 
     except (RateLimitError, APIConnectionError, APIStatusError, OpenAIError) as e:
-        current_app.logger.error(f"OpenAI API error during image generation: {e}")
-        raise  # Let Celery handle the retry
+        current_app.logger.error(f"[OAI] error: {e}")
+        raise  # let Celery retry
     except Exception as e:
-        current_app.logger.error(f"An unexpected error occurred in generate_slide_image: {e}", exc_info=True)
+        current_app.logger.error(f"[IMG] unexpected error: {e}", exc_info=True)
         return None, image_prompt
+
