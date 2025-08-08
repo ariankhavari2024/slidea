@@ -1,29 +1,25 @@
-# render.yaml — Slidea (Web + Worker + Postgres + KeyValue + MinIO)
+# render.yaml — Slidea (Web + Worker + Postgres + KeyValue + MinIO) — Hobby friendly
 
 databases:
   - name: slidea-db
-    plan: standard
-    # Optional: open while you iterate; tighten later
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: allow all (dev)
+    plan: starter            # was 'standard' → use starter on Hobby
 
 services:
   # Redis-compatible Key Value
   - type: keyvalue
     name: slidea-redis
-    plan: standard
-    # REQUIRED by spec
+    plan: starter            # was 'standard'
     ipAllowList:
       - source: 0.0.0.0/0
         description: allow all (dev)
 
-  # MinIO object storage for shared uploads
+  # MinIO object storage (S3 API) for shared uploads
   - type: pserv
     name: slidea-minio
     runtime: docker
-    plan: standard
+    plan: starter            # was 'standard'
     repo: https://github.com/render-examples/minio.git
+    numInstances: 1
     envVars:
       - key: MINIO_ROOT_USER
         sync: false
@@ -31,7 +27,7 @@ services:
         generateValue: true
       - key: PORT
         value: "10000"
-    disk:
+    disk:                    # singular; only this service gets a disk
       name: uploads
       mountPath: /data
       sizeGB: 1
@@ -40,14 +36,10 @@ services:
   - type: web
     name: slidea-web
     runtime: docker
-    plan: standard
+    plan: starter
     dockerfilePath: ./Dockerfile
     autoDeploy: true
-    scaling:
-      minInstances: 1
-      maxInstances: 3
-      targetCPUPercent: 70
-      targetMemoryPercent: 70
+    numInstances: 1          # no autoscaling on Hobby
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
@@ -56,7 +48,7 @@ services:
       - key: FLASK_ENV
         value: production
       - key: WEB_CONCURRENCY
-        value: "4"
+        value: "2"           # small dyno, keep modest
       - key: SECRET_KEY
         generateValue: true
 
@@ -66,7 +58,7 @@ services:
           name: slidea-db
           property: connectionString
 
-      # Redis pieces (assemble URL in code)
+      # Redis (assemble URL in code)
       - key: REDIS_HOST
         fromService:
           name: slidea-redis
@@ -96,7 +88,7 @@ services:
       - key: S3_USE_SSL
         value: "false"
 
-      # Third-party secrets (set in UI)
+      # Third-party secrets
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
@@ -119,14 +111,10 @@ services:
   - type: worker
     name: slidea-worker
     runtime: docker
-    plan: standard
+    plan: starter
     dockerfilePath: ./Dockerfile
     autoDeploy: true
-    scaling:
-      minInstances: 1
-      maxInstances: 5
-      targetCPUPercent: 70
-      targetMemoryPercent: 70
+    numInstances: 1
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
@@ -150,37 +138,4 @@ services:
           property: host
       - key: REDIS_PORT
         fromService:
-          name: slidea-redis
-          type: keyvalue
-          property: port
-
-      - key: S3_ENDPOINT
-        value: http://slidea-minio:10000
-      - key: S3_ACCESS_KEY
-        fromService:
-          name: slidea-minio
-          type: pserv
-          envVarKey: MINIO_ROOT_USER
-      - key: S3_SECRET_KEY
-        fromService:
-          name: slidea-minio
-          type: pserv
-          envVarKey: MINIO_ROOT_PASSWORD
-      - key: S3_BUCKET
-        value: slidea-uploads
-      - key: S3_USE_SSL
-        value: "false"
-
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_PRICE_ID_PRO
-        sync: false
-      - key: STRIPE_PRICE_ID_CREATOR
-        sync: false
-
-      - key: SERVICE_TYPE
-        value: worker
-      - key: IS_WEB_SERVICE
-        value: "false"
+          n
