@@ -191,8 +191,21 @@ def create_app(config_class=Config):
     print(app.url_map)
     print("----------------------------------------------------------")
 
+    # Ensure MinIO bucket exists (idempotent)
+    from .storage import ensure_bucket
+    with app.app_context():
+        ensure_bucket()
+
+    # Health Check for Render
+    @app.route("/health", methods=["GET"])
+    def health():
+        return "ok", 200
+
     return app
 if os.environ.get("IS_WEB_SERVICE") == "false":
     print("--- Running as a worker: bootstrapping Flask and Celery manually ---")
     flask_app = create_app()
     celery = make_celery(flask_app)
+    from .storage import ensure_bucket
+    with flask_app.app_context():
+        ensure_bucket()
